@@ -418,10 +418,14 @@ export function mount(host, opts = {}) {
       // sample points on the part until one picks back to the same id
       const meshes = []; p.g.traverse(o => { if (o.isMesh && o.visible && !(o.material && o.material.transparent)) meshes.push(o); });
       for (const m of meshes) {
-        const bb = new THREE.Box3().setFromObject(m), c = bb.getCenter(new THREE.Vector3());
-        c.project(camera);
-        const x = b.left + (c.x + 1) / 2 * b.width, y = b.top + (1 - c.y) / 2 * b.height;
-        if (x > b.left + 2 && x < b.right - 2 && y > b.top + 2 && y < b.bottom - 2 && pick(x, y) === id) return { x, y };
+        const bb = new THREE.Box3().setFromObject(m);
+        const fr = [0.5, 0.2, 0.8, 0.35, 0.65, 0.1, 0.9];
+        for (const fx of fr) for (const fy of fr) for (const fz of [0.5, 0, 1, 0.25, 0.75]) {
+          const c = new THREE.Vector3(bb.min.x + (bb.max.x - bb.min.x) * fx, bb.min.y + (bb.max.y - bb.min.y) * fy, bb.min.z + (bb.max.z - bb.min.z) * fz);
+          c.project(camera);
+          const x = b.left + (c.x + 1) / 2 * b.width, y = b.top + (1 - c.y) / 2 * b.height;
+          if (x > b.left + 2 && x < b.right - 2 && y > b.top + 2 && y < b.bottom - 2 && pick(x, y) === id) return { x, y };
+        }
       }
       return null;
     },

@@ -50,7 +50,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     HTMLAnchorElement.prototype.click = function () { if (/^(sms:|https:\/\/wa\.me)/.test(this.href)) { window.__links.push(this.href); return; } return orig.call(this); };
   });
   const page = await ctx.newPage();
-  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
   const res = await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
   ok(res.status() === 200, `${tag} status ${res.status()}`);
   ok(await page.$eval('#region', e => e.value) === mk.region, `${tag} region`);
@@ -119,6 +119,13 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   if (w === 1440 && mk.region === 'US') { await page.selectOption('#cc', 'AE'); }
   await page.locator('#locBtn').click(); await sleep(1500);
   ok(await page.$eval('#loc', e => e.classList.contains('has')), `${tag} location pin added`);
+  // drag the map so the pin moves, then the message must carry the new spot
+  const mb = await page.locator('.map').boundingBox();
+  await page.mouse.move(mb.x + mb.width / 2, mb.y + mb.height / 2); await page.mouse.down();
+  await page.mouse.move(mb.x + mb.width / 2 - 64, mb.y + mb.height / 2 - 32, { steps: 6 }); await page.mouse.up(); await sleep(300);
+  const moved = await page.evaluate(() => window.__gleamLoc());
+  ok(moved && moved.moved && moved.lng > -0.1246 && moved.lat < 51.5007, `${tag} pin drag moves location`);
+  const mapsUrl = moved ? `https://maps.google.com/?q=${moved.lat.toFixed(6)},${moved.lng.toFixed(6)}` : 'x';
   const osmVis = await page.$eval('#osm', e => !e.hidden);
   if (osmVis) ok(/OpenStreetMap contributors/.test(await page.$eval('#osm', e => e.textContent)), `${tag} OSM attribution`);
   await sleep(600);
@@ -142,16 +149,16 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   ok(body.includes('Yusuf'), `${tag} body name`);
   ok(body.includes(`${expDial} ${national.replace(/^0/, '')}`), `${tag} body mobile with ${expDial}`);
   ok(body.includes(total), `${tag} body total ${total}`);
-  ok(body.includes('https://maps.google.com/?q=51.5'), `${tag} body location`);
+  ok(body.includes(mapsUrl), `${tag} body exact maps link ${mapsUrl}`);
   const labels = mk.ar ? ['النوافذ، من الخارج والداخل', 'الألواح الشمسية', 'المزاريب', 'غسيل السطح', 'غسيل الواجهات', 'الممر والمواقف', 'الحوش والممرات'] : ['Windows, outside and inside', 'Solar panels', 'Gutters', 'Roof soft wash', 'Walls soft wash', 'Driveway', 'Patio and paths'];
   for (const l of labels) ok(body.includes(l), `${tag} body has ${l}`);
   ok(mk.scheme === 'sms' ? !body.includes('*') : body.includes(mk.ar ? '*التقدير' : '*Estimate'), `${tag} message formatting`);
-  if (mk.ar) ok(!/[A-Za-z]{3,}/.test(body.replace(/https?:\S+/g, '')), `${tag} message all Arabic`);
+  if (mk.ar) ok(!/[A-Za-z]{3,}/.test(body.replace(/https?:\S+/g, '').replace('Yusuf', '')), `${tag} message all Arabic`);
   ok(!DASH.test(body.replace(/https?:\S+/g, '')), `${tag} no dash in message`);
   messages[mk.path] = body;
   if (mk.ar) {
     // English switch on the Saudi page
-    await page.evaluate(() => scrollTo(0, 0)); await page.locator('#langSw button[data-lang="en"]').click(); await sleep(700);
+    await page.evaluate(() => scrollTo(0, 0)); await sleep(2500); await page.locator('#langSw button[data-lang="en"]').click(); await sleep(700);
     ok(await page.evaluate(() => document.documentElement.dir === 'ltr' && document.querySelector('h1').textContent.startsWith('Your price')), `${tag} EN switch`);
     ok((await page.$eval('#sumBtn', e => e.textContent.trim())) === 'Book on WhatsApp', `${tag} EN button`);
     ok((await amount(page)).includes('SAR'), `${tag} EN keeps SAR`);
@@ -173,6 +180,24 @@ for (const [tz, q, exp] of [['Europe/London', '', 'UK'], ['Australia/Sydney', ''
   const ctx = await browser.newContext({ timezoneId: tz, viewport: { width: 390, height: 800 } });
   const page = await ctx.newPage(); await page.goto(BASE + '/' + q);
   ok(await page.$eval('#region', e => e.value) === exp, `root ${tz} ${q} -> ${exp}`);
+  await ctx.close();
+}
+// location denied: friendly note, booking still works without a map link
+for (const mk of MARKETS) {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 800 }, timezoneId: mk.tz || 'Asia/Dubai' });
+  await ctx.addInitScript(() => { window.__links = []; const o = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (/^(sms:|https:\/\/wa\.me)/.test(this.href)) { window.__links.push(this.href); return; } return o.call(this); }; navigator.geolocation.getCurrentPosition = (s, e) => setTimeout(() => e({ code: 1, message: 'denied' }), 50); });
+  const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
+  await page.locator('.svc[data-id="gutters"] .svc-main').click();
+  await page.fill('#name', 'Omar'); await page.fill('#phone', '0412345678');
+  await page.locator('#locBtn').click(); await sleep(400);
+  const s = await page.$eval('#locS', e => e.textContent);
+  ok(!(await page.$eval('#loc', e => e.classList.contains('has'))) && (mk.ar ? /تقدر تحجز/.test(s) : /still book/.test(s)), `${mk.path} denied note "${s}"`);
+  await page.locator('#sumBtn').click(); await sleep(300);
+  const h = await page.evaluate(() => window.__links[0] || '');
+  ok(h.startsWith(mk.scheme === 'sms' ? 'sms:+971500000000' : 'https://wa.me/971500000000') && !decodeURIComponent(h).includes('maps.google'), `${mk.path} denied still books`);
+  ok(errs.length === 0, `${mk.path} denied errors ${errs}`);
+  if (mk.path === '/us/' || mk.path === '/sa/') await page.screenshot({ path: `${OUT}/${mk.path.replace(/\//g, '')}-390-location-denied.png` });
   await ctx.close();
 }
 // fallback: without WebGL or with the 3D script blocked, the drawn house still works
@@ -200,7 +225,7 @@ for (const mode of ['flat', 'blocked']) {
   await ctx.close();
 }
 // owner: one number, one config block, prices in one place
-const src = fs.readFileSync(new URL('../src/index.html', import.meta.url), 'utf8');
+const src = fs.readFileSync(process.env.SRC || new URL('../src/index.html', import.meta.url), 'utf8');
 ok((src.match(/971500000000/g) || []).length === 1, 'owner: placeholder number set in one place');
 ok(src.indexOf('BUSINESS SETTINGS') < src.indexOf('const SIZES'), 'owner: settings block at top of script');
 ok(/booking: 'sms'/.test(src) && /booking: 'whatsapp'/.test(src), 'owner: booking channel per market');

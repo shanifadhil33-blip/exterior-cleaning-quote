@@ -286,6 +286,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .m-bg{fill:var(--well)}
 .m-road{stroke:var(--surface);stroke-linecap:round}
 .tiles{position:absolute;left:50%;top:50%;width:768px;height:768px}
+.map{touch-action:none;cursor:grab}.map.drag{cursor:grabbing}.map.drag .tiles img{transition:none}
 .tiles img{position:absolute;width:256px;height:256px;max-width:none;opacity:0;transition:opacity .5s;filter:grayscale(1) contrast(.95) brightness(1.03)}
 .tiles img.ok{opacity:.92}
 @media (prefers-color-scheme: dark){.tiles img{filter:grayscale(1) invert(1) brightness(.78) contrast(.9)}}
@@ -644,7 +645,7 @@ const AR = {
   'What needs cleaning': 'وش تبي ننظف', 'Your details': 'بياناتك', 'Your name': 'اسمك',
   'First name is fine': 'الاسم الأول يكفي', 'Mobile number': 'رقم الجوال',
   'Preferred day': 'اليوم المناسب', 'Time of day': 'الوقت المناسب',
-  'Share my location': 'شارك موقعي', 'Adds a map pin to your message.': 'يضيف موقعك على الخريطة في رسالتك.',
+  'Share my location': 'شارك موقعي', 'Pin moved. Drag the map to adjust.': 'تم تحريك الدبوس. اسحب الخريطة للتعديل.', 'Adds a map pin to your message.': 'يضيف موقعك على الخريطة في رسالتك.',
   'Remove': 'إزالة', 'Your estimate': 'تقديرك', 'Demo page with sample prices.': 'صفحة تجريبية بأسعار للعرض.',
   'Region and currency': 'المنطقة والعملة', 'Country code': 'رمز الدولة',
   'Your home. Tap a part to add it to your quote.': 'بيتك. اضغط على أي جزء لإضافته لعرض السعر.',
@@ -1281,11 +1282,18 @@ function fallbackMap() {
   for (let i = 0; i < 9; i++) { const x = rn() * 400; s += `<line x1="${x.toFixed(1)}" y1="-10" x2="${(x + (rn() - 0.5) * 80).toFixed(1)}" y2="178" class="m-road" stroke-width="${rn() > 0.7 ? 9 : 5}"/>`; }
   return s + '</svg>';
 }
+let mapT = null;
+function tileToLL(xt, yt, n) {
+  const lng = xt / n * 360 - 180;
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * yt / n))) * 180 / Math.PI;
+  return { lat, lng };
+}
 function renderTiles(lat, lng) {
   const z = 17, n = Math.pow(2, z);
   const xt = (lng + 180) / 360 * n;
   const latR = lat * Math.PI / 180;
   const yt = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n;
+  mapT = { xt, yt, n };
   const ix = Math.floor(xt), iy = Math.floor(yt);
   const fxp = (xt - ix) * 256, fyp = (yt - iy) * 256;
   tiles.innerHTML = '';
@@ -1310,7 +1318,8 @@ function setLoc(mode, msg) {
   if (mode === 'has') {
     const a = state.loc.acc || 0, r = R();
     locT.textContent = tr('Location added');
-    if (a > 1500) locS.textContent = tr('Approximate location');
+    if (state.loc.moved) locS.textContent = tr('Pin moved. Drag the map to adjust.');
+    else if (a > 1500) locS.textContent = tr('Approximate location');
     else if (isAr()) locS.textContent = `دقة تقريبية ${Math.max(5, Math.round(a / 5) * 5)} م`;
     else if (r.units === 'ft') locS.textContent = `Accurate to about ${Math.max(10, Math.round(a * 3.28084 / 10) * 10)} ft`;
     else locS.textContent = `Accurate to about ${Math.max(5, Math.round(a / 5) * 5)} m`;
@@ -1432,6 +1441,32 @@ locBtn.addEventListener('click', () => {
   }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
 });
 locX.addEventListener('click', () => { state.loc = null; setLoc('idle'); });
+window.__gleamLoc = () => state.loc;
+/* drag the map to move the pin: the pin stays in the middle, the map moves under it */
+{
+  const map = $('.map'); let d = null;
+  map.addEventListener('pointerdown', e => {
+    if (!state.loc || !mapT || e.target.closest('a')) return;
+    d = { x: e.clientX, y: e.clientY, base: tiles.style.transform, dx: 0, dy: 0 };
+    map.classList.add('drag'); map.setPointerCapture(e.pointerId);
+  });
+  map.addEventListener('pointermove', e => {
+    if (!d) return;
+    d.dx = e.clientX - d.x; d.dy = e.clientY - d.y;
+    tiles.style.transform = `${d.base} translate(${d.dx}px, ${d.dy}px)`;
+  });
+  const end = () => {
+    if (!d) return;
+    map.classList.remove('drag');
+    if (Math.abs(d.dx) + Math.abs(d.dy) > 2) {
+      const ll = tileToLL(mapT.xt - d.dx / 256, mapT.yt - d.dy / 256, mapT.n);
+      state.loc = { lat: ll.lat, lng: ll.lng, acc: 5, moved: true };
+      renderTiles(ll.lat, ll.lng); setLoc('has');
+    }
+    d = null;
+  };
+  map.addEventListener('pointerup', end); map.addEventListener('pointercancel', end);
+}
 
 function renderCountries() {
   const own = R().country;
