@@ -114,7 +114,12 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     await noSideScroll(page, `${tag} ${id}`);
   }
   // options
-  await page.locator('.svc[data-id="windows"] .chip').first().click(); await sleep(700);
+  const inside = page.locator('.svc[data-id="windows"] .chip').first();
+  await inside.evaluate(el => el.scrollIntoView({ block: 'center', inline: 'nearest' }));
+  await sleep(250);
+  try { await inside.click({ timeout: 8000 }); }
+  catch (e) { ok(false, `${tag} inside windows chip ${e.message.split('\n')[0]}`); }
+  await sleep(700);
   ok(num(await amount(page)) !== last, `${tag} inside windows changes price`);
   await page.evaluate(() => scrollTo(0, 0)); await sleep(500);
   await page.screenshot({ path: `${OUT}/${fk}-${w}-2-clean.png` });
@@ -236,9 +241,192 @@ for (const mode of ['flat', 'blocked']) {
 }
 // owner: one number, one config block, prices in one place
 const src = fs.readFileSync(process.env.SRC || new URL('../src/index.html', import.meta.url), 'utf8');
+const houseSrc = fs.readFileSync(new URL('../src/house3d.js', import.meta.url), 'utf8');
 ok((src.match(/971500000000/g) || []).length === 1, 'owner: placeholder number set in one place');
 ok(src.indexOf('BUSINESS SETTINGS') < src.indexOf('const SIZES'), 'owner: settings block at top of script');
 ok(/booking: 'sms'/.test(src) && /booking: 'whatsapp'/.test(src), 'owner: booking channel per market');
+ok(!/prefers-color-scheme/.test(src + houseSrc), 'owner: theme does not follow the system scheme');
+ok(/color-scheme:\s*only light/.test(src) && /color-scheme:\s*only dark/.test(src), 'owner: explicit color scheme for both themes');
+ok(src.indexOf("localStorage.getItem('gleam.theme')") < src.indexOf('<style>'), 'owner: saved theme is applied before first paint');
+ok(/id="themeBtn"/.test(src) && /gleam\.theme/.test(src), 'owner: theme toggle is remembered');
+ok(/background-color:#ECEEEE/.test(src) && /background-color:#F9FAFA/.test(src) && /background-color:#E2E6E7/.test(src), 'owner: explicit light backgrounds');
+ok(/0xe2e6e7/.test(houseSrc) && /0x0e1215/.test(houseSrc) && /NeutralToneMapping/.test(houseSrc) && /HemisphereLight/.test(houseSrc), 'owner: house stays lit in both themes');
+
+// Light and dark emulation must render the same bright page.
+const { PNG } = await import('pngjs');
+const pixelmatch = (await import('pixelmatch')).default;
+const SCHEME_WIDTHS = [360, 390, 1440];
+const bright = (label, value) => {
+  const m = String(value).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  ok(!!m && Number(m[1]) >= 220 && Number(m[2]) >= 220 && Number(m[3]) >= 220, `${label} background ${value}`);
+};
+function pngDiff(aPath, bPath) {
+  const a = PNG.sync.read(fs.readFileSync(aPath));
+  const b = PNG.sync.read(fs.readFileSync(bPath));
+  if (a.width !== b.width || a.height !== b.height) return { ratio: 1, mismatch: `${a.width}x${a.height} vs ${b.width}x${b.height}` };
+  const diff = new PNG({ width: a.width, height: a.height });
+  const n = pixelmatch(a.data, b.data, diff.data, a.width, a.height, { threshold: 0.1 });
+  return { ratio: n / (a.width * a.height), n };
+}
+for (const mk of MARKETS) {
+  if (mk.path === '/') continue;
+  for (const w of SCHEME_WIDTHS) {
+    const tag = `scheme ${mk.key || mk.path} ${w}`;
+    const fk = mk.key || (mk.path.replace(/\//g, '') || 'root');
+    const shots = {};
+    for (const scheme of ['light', 'dark']) {
+      const phone = w < 960;
+      const ctx = await browser.newContext({
+        viewport: { width: w, height: phone ? 800 : 900 },
+        deviceScaleFactor: 1,
+        hasTouch: phone,
+        isMobile: phone,
+        colorScheme: scheme,
+        reducedMotion: 'reduce',
+        timezoneId: 'Asia/Dubai',
+      });
+      if (mk.ar) await ctx.addInitScript(() => localStorage.setItem('gleam.lang', 'ar'));
+      const page = await ctx.newPage();
+      const errs = [];
+      page.on('pageerror', e => errs.push(e.message));
+      page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
+      await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__h3d && window.__h3d.fps() > 0, null, { timeout: 20000 }).catch(() => {});
+      await page.evaluate(() => document.fonts.ready);
+      await sleep(500);
+      const info = await page.evaluate(() => {
+        const bg = el => el ? getComputedStyle(el).backgroundColor : '';
+        const cs = getComputedStyle(document.documentElement);
+        return {
+          scheme: cs.colorScheme,
+          html: bg(document.documentElement),
+          body: bg(document.body),
+          input: bg(document.querySelector('#name')),
+          phone: bg(document.querySelector('#phone')),
+          canvas: bg(document.querySelector('canvas.gl3')),
+          bgVar: cs.getPropertyValue('--bg').trim(),
+          wall: cs.getPropertyValue('--h-wall').trim(),
+          sw: document.documentElement.scrollWidth,
+          w: innerWidth,
+          fps: window.__h3d ? window.__h3d.fps() : 0,
+        };
+      });
+      ok(info.sw <= info.w, `${tag} ${scheme} sideways scroll ${info.sw}>${info.w}`);
+      ok(/light/.test(info.scheme) && !/^dark$/.test(info.scheme), `${tag} ${scheme} used scheme ${info.scheme}`);
+      ok(sameColor(info.bgVar, '#ECEEEE'), `${tag} ${scheme} --bg ${info.bgVar}`);
+      ok(sameColor(info.wall, '#FFFFFF'), `${tag} ${scheme} wall token ${info.wall}`);
+      bright(`${tag} ${scheme} html`, info.html);
+      bright(`${tag} ${scheme} body`, info.body);
+      bright(`${tag} ${scheme} input`, info.input);
+      bright(`${tag} ${scheme} phone`, info.phone);
+      bright(`${tag} ${scheme} canvas`, info.canvas);
+      ok(errs.length === 0, `${tag} ${scheme} page errors ${errs.join(';')}`);
+      if (phone) fpsLog.push(`${tag} ${scheme} ${info.fps}`);
+      const path = `${OUT}/scheme-${fk}-${w}-${scheme}.png`;
+      await page.screenshot({ path });
+      shots[scheme] = path;
+      await ctx.close();
+    }
+    const diff = pngDiff(shots.light, shots.dark);
+    ok(diff.ratio < 0.005, `${tag} system schemes differ ${(diff.ratio * 100).toFixed(2)}% ${diff.mismatch || ''}`);
+  }
+}
+function parseRgb(value) {
+  const m = String(value).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+function sameColor(value, hex) {
+  const v = String(value).trim();
+  if (v.toUpperCase() === hex.toUpperCase()) return true;
+  const rgb = parseRgb(v);
+  const h = hex.replace('#', '');
+  if (!rgb || h.length !== 6) return false;
+  return rgb[0] === parseInt(h.slice(0, 2), 16) && rgb[1] === parseInt(h.slice(2, 4), 16) && rgb[2] === parseInt(h.slice(4, 6), 16);
+}
+function relLum([r, g, b]) {
+  const f = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+function contrast(a, b) {
+  const L1 = relLum(a), L2 = relLum(b);
+  return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+}
+// Chosen themes. System dark mode still opens on the light design, then the toggle switches.
+for (const mk of MARKETS) {
+  if (mk.path === '/') continue;
+  for (const w of SCHEME_WIDTHS) {
+    const tag = `theme ${mk.key || mk.path} ${w}`;
+    const fk = mk.key || (mk.path.replace(/\//g, '') || 'root');
+    const phone = w < 960;
+    const ctx = await browser.newContext({
+      viewport: { width: w, height: phone ? 800 : 900 },
+      deviceScaleFactor: 1,
+      hasTouch: phone,
+      isMobile: phone,
+      colorScheme: 'dark',
+      reducedMotion: 'reduce',
+      timezoneId: 'Asia/Dubai',
+    });
+    if (mk.ar) await ctx.addInitScript(() => localStorage.setItem('gleam.lang', 'ar'));
+    const page = await ctx.newPage();
+    const errs = [];
+    page.on('pageerror', e => errs.push(e.message));
+    page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
+    await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => window.__h3d && window.__h3d.fps() > 0, null, { timeout: 20000 }).catch(() => {});
+    await page.evaluate(() => document.fonts.ready);
+    await sleep(400);
+    ok(await page.evaluate(() => document.documentElement.getAttribute('data-theme')) === 'light', `${tag} defaults to light`);
+    await page.screenshot({ path: `${OUT}/theme-${fk}-${w}-light.png` });
+    await page.locator('#themeBtn').click();
+    await sleep(700);
+    const dark = await page.evaluate(() => {
+      const bg = el => getComputedStyle(el).backgroundColor;
+      const cs = getComputedStyle(document.documentElement);
+      const theme = document.querySelector('#themeBtn').getBoundingClientRect();
+      const region = document.querySelector('.region').getBoundingClientRect();
+      return {
+        theme: document.documentElement.getAttribute('data-theme'),
+        scheme: cs.colorScheme,
+        stored: localStorage.getItem('gleam.theme'),
+        body: bg(document.body),
+        text: getComputedStyle(document.body).color,
+        muted: getComputedStyle(document.querySelector('.hero p')).color,
+        input: bg(document.querySelector('#phone')),
+        canvas: bg(document.querySelector('canvas.gl3')),
+        label: document.querySelector('#themeBtn').getAttribute('aria-label'),
+        sw: document.documentElement.scrollWidth,
+        w: innerWidth,
+        themeBox: { left: theme.left, right: theme.right, top: theme.top, bottom: theme.bottom },
+        regionBox: { left: region.left, right: region.right, top: region.top, bottom: region.bottom },
+        dir: document.documentElement.dir,
+        house: !!(window.__h3d && window.__h3d.fps() >= 0),
+      };
+    });
+    ok(dark.theme === 'dark' && dark.stored === 'dark', `${tag} toggle stores dark`);
+    ok(/dark/.test(dark.scheme), `${tag} color scheme ${dark.scheme}`);
+    const body = parseRgb(dark.body), text = parseRgb(dark.text), muted = parseRgb(dark.muted), input = parseRgb(dark.input), canvas = parseRgb(dark.canvas);
+    ok(body && body.every(c => c < 40), `${tag} charcoal page ${dark.body}`);
+    ok(text && body && contrast(text, body) >= 7, `${tag} text contrast`);
+    ok(muted && body && contrast(muted, body) >= 4.5, `${tag} muted contrast`);
+    ok(input && input.every(c => c < 55), `${tag} input surface ${dark.input}`);
+    ok(canvas && canvas.every(c => c < 40), `${tag} house stage ${dark.canvas}`);
+    ok(dark.house, `${tag} 3D house still mounted`);
+    ok(dark.sw <= dark.w, `${tag} sideways scroll ${dark.sw}>${dark.w}`);
+    const gap = Math.min(Math.abs(dark.themeBox.left - dark.regionBox.right), Math.abs(dark.regionBox.left - dark.themeBox.right));
+    const sameRow = dark.themeBox.top < dark.regionBox.bottom && dark.regionBox.top < dark.themeBox.bottom;
+    ok(gap <= 20 && sameRow, `${tag} toggle beside market picker gap ${gap}`);
+    ok(dark.themeBox.left >= -1 && dark.themeBox.right <= dark.w + 1, `${tag} toggle inside the viewport`);
+    ok(dark.dir === 'rtl' ? gap <= 20 : true, `${tag} rtl toggle placement`);
+    ok(!DASH.test(dark.label), `${tag} toggle label dash ${dark.label}`);
+    if (mk.ar) ok(dark.label === 'حول إلى المظهر الفاتح', `${tag} arabic toggle label ${dark.label}`);
+    ok(errs.length === 0, `${tag} page errors ${errs.join(';')}`);
+    await page.screenshot({ path: `${OUT}/theme-${fk}-${w}-dark.png` });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    ok(await page.evaluate(() => document.documentElement.getAttribute('data-theme') === 'dark' && getComputedStyle(document.body).backgroundColor !== 'rgb(236, 238, 238)'), `${tag} dark theme restored before paint`);
+    await ctx.close();
+  }
+}
 fs.writeFileSync(`${OUT}/messages.txt`, Object.entries(messages).map(([k, v]) => `==== ${k}\n${v}\n`).join('\n'));
 fs.writeFileSync(`${OUT}/report.json`, JSON.stringify({ base: BASE, pass, fail, fails, fps: fpsLog }, null, 1));
 console.log(`PASS ${pass} FAIL ${fail}`);

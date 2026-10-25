@@ -3,17 +3,45 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="only light" id="colorSchemeMeta">
+<meta name="supported-color-schemes" content="light" id="supportedSchemeMeta">
+<meta name="theme-color" content="#ECEEEE" id="themeColorMeta">
+<script>
+(function () {
+  var theme = 'light';
+  try { if (localStorage.getItem('gleam.theme') === 'dark') theme = 'dark'; } catch (e) {}
+  var dark = theme === 'dark';
+  var root = document.documentElement;
+  root.setAttribute('data-theme', theme);
+  root.style.colorScheme = dark ? 'only dark' : 'only light';
+  var scheme = document.getElementById('colorSchemeMeta');
+  if (scheme) scheme.setAttribute('content', dark ? 'only dark' : 'only light');
+  var supported = document.getElementById('supportedSchemeMeta');
+  if (supported) supported.setAttribute('content', dark ? 'dark' : 'light');
+  var color = document.getElementById('themeColorMeta');
+  if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
+})();
+</script>
 <title>Gleam | Instant exterior cleaning quote</title>
 <meta name="description" content="Build your exterior cleaning quote on your own home and book it by text or WhatsApp.">
-<meta name="theme-color" content="#ECEEEE" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#101315" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231D2125'/%3E%3Cpath d='M6 23l7.5-12 4.2 6.4 2.8-3.8L26 23' fill='none' stroke='%23F9FAFA' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <style>
+@property --bg { syntax: "<color>"; inherits: true; initial-value: #ECEEEE; }
+@property --surface { syntax: "<color>"; inherits: true; initial-value: #F9FAFA; }
+@property --sel { syntax: "<color>"; inherits: true; initial-value: #F1F3F4; }
+@property --ink { syntax: "<color>"; inherits: true; initial-value: #1D2125; }
+@property --ink-2 { syntax: "<color>"; inherits: true; initial-value: #3A4146; }
+@property --muted { syntax: "<color>"; inherits: true; initial-value: #6F767B; }
+@property --faint { syntax: "<color>"; inherits: true; initial-value: #A3AAAE; }
+@property --well { syntax: "<color>"; inherits: true; initial-value: #E1E4E5; }
+@property --thumb { syntax: "<color>"; inherits: true; initial-value: #F9FAFA; }
+@property --on-ink { syntax: "<color>"; inherits: true; initial-value: #F9FAFA; }
+@property --stage { syntax: "<color>"; inherits: true; initial-value: #E2E6E7; }
 :root{
-  color-scheme: light;
+  color-scheme: only light;
   --sans:"Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --ease:cubic-bezier(.2,.7,.2,1);
 
@@ -58,56 +86,35 @@
   --h-panel:#3E474D;
   --h-cell:rgba(255,255,255,.22);
 }
-@media (prefers-color-scheme: dark){
-  :root{
-    color-scheme: dark;
-    --bg:#101315;
-    --surface:#181C1F;
-    --sel:#1D2226;
-    --ink:#EEF1F2;
-    --ink-2:#C9CFD2;
-    --muted:#8A9297;
-    --faint:#5B6368;
-    --line:rgba(238,241,242,.08);
-    --line-2:rgba(238,241,242,.16);
-    --well:#20252A;
-    --thumb:#2B3237;
-    --on-ink:#101315;
-    --ring:rgba(238,241,242,.18);
-    --stage:#161A1D;
-
-    --h-lawn:#1F2427;
-    --h-ground:rgba(238,241,242,.14);
-    --h-wall:#343B40;
-    --h-wall-2:#2B3136;
-    --h-siding:rgba(238,241,242,.045);
-    --h-roof:#14181B;
-    --h-roofline:rgba(238,241,242,.06);
-    --h-line:rgba(238,241,242,.55);
-    --h-glass:#46525A;
-    --h-shine:#E6ECEF;
-    --h-door:#101315;
-    --h-pave:#2C3236;
-    --h-joint:rgba(238,241,242,.07);
-    --h-gutter:#454D53;
-    --h-grime:#0A0907;
-    --h-streak:#000000;
-    --h-moss:#575240;
-    --h-leaf:#6C6450;
-    --h-tree:#232A2E;
-    --h-shrub:#262D31;
-    --h-sweep:#FFFFFF;
-    --h-panel:#0B0E10;
-    --h-cell:rgba(238,241,242,.16);
-  }
+html[data-theme="dark"]{
+  color-scheme: only dark;
+  --bg:#121618;
+  --surface:#1C2126;
+  --sel:#262C31;
+  --ink:#F4F6F7;
+  --ink-2:#D7DCDE;
+  --muted:#B7BFC2;
+  --faint:#8E979C;
+  --line:rgba(244,246,247,.10);
+  --line-2:rgba(244,246,247,.18);
+  --well:#262C31;
+  --thumb:#343B40;
+  --on-ink:#121618;
+  --ring:rgba(244,246,247,.20);
+  --stage:#0E1215;
+}
+html.theme-ready{
+  transition:--bg .45s var(--ease),--surface .45s var(--ease),--sel .45s var(--ease),--ink .45s var(--ease),--ink-2 .45s var(--ease),--muted .45s var(--ease),--faint .45s var(--ease),--well .45s var(--ease),--thumb .45s var(--ease),--on-ink .45s var(--ease),--stage .45s var(--ease),background-color .45s var(--ease),color .45s var(--ease);
 }
 
 *,*::before,*::after{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:50}
+html{color-scheme:only light;background-color:#ECEEEE;background-color:var(--bg);color:#1D2125;color:var(--ink);-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
+body{margin:0;background-color:#ECEEEE;background-color:var(--bg);color:#1D2125;color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:#ECEEEE;background:var(--bg);z-index:50}
 h1,h2,p{margin:0}
 button,input,select{font:inherit;color:inherit;letter-spacing:inherit}
+input,select,textarea{background-color:#F9FAFA;background-color:var(--surface);color:#1D2125;color:var(--ink);color-scheme:only light}
+html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{color-scheme:only dark}
 button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 :focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
@@ -120,7 +127,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .brand{display:inline-flex;align-items:center;gap:10px;color:inherit;text-decoration:none;font-weight:650;font-size:17px;letter-spacing:-.015em}
 .mark{width:34px;height:34px;border-radius:11px;background:var(--ink);color:var(--on-ink);display:grid;place-items:center}
 .region{position:relative;display:inline-flex}
-.region select{appearance:none;-webkit-appearance:none;height:36px;padding-block:0;padding-inline:14px 32px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);font-size:14px;font-weight:550;cursor:pointer}
+.region select{appearance:none;-webkit-appearance:none;height:36px;padding-block:0;padding-inline:14px 32px;border:1px solid var(--line-2);border-radius:999px;background-color:#F9FAFA;background-color:var(--surface);color:var(--ink);font-size:14px;font-weight:550;cursor:pointer}
 .region::after{content:"";position:absolute;inset-inline-end:14px;top:50%;width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:translateY(-70%) rotate(45deg);pointer-events:none}
 
 /* hero */
@@ -247,11 +254,11 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 /* details */
 .fields{display:grid;gap:12px}
 .field span{display:block;margin:0 0 7px 2px;font-size:14px;font-weight:550;color:var(--ink-2)}
-.input{display:block;width:100%;height:54px;padding:0 16px;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);font-size:16px;outline:none;-webkit-appearance:none;appearance:none;transition:border-color .2s,box-shadow .2s}
+.input{display:block;width:100%;height:54px;padding:0 16px;border:1px solid var(--line-2);border-radius:14px;background-color:#F9FAFA;background-color:var(--surface);color:var(--ink);font-size:16px;outline:none;-webkit-appearance:none;appearance:none;transition:border-color .2s,box-shadow .2s}
 .input::placeholder{color:var(--faint)}
 .input:focus{border-color:var(--ink);box-shadow:0 0 0 4px var(--ring)}
 .tel{display:flex;gap:8px}
-.cc{position:relative;flex:none;display:flex;align-items:center;gap:6px;height:54px;padding:0 30px 0 14px;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);font-size:16px;font-weight:550;white-space:nowrap;transition:border-color .2s,box-shadow .2s}
+.cc{position:relative;flex:none;display:flex;align-items:center;gap:6px;height:54px;padding:0 30px 0 14px;border:1px solid var(--line-2);border-radius:14px;background-color:#F9FAFA;background-color:var(--surface);color:var(--ink);font-size:16px;font-weight:550;white-space:nowrap;transition:border-color .2s,box-shadow .2s}
 .cc::after{content:"";position:absolute;inset-inline-end:13px;top:50%;width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:translateY(-70%) rotate(45deg);pointer-events:none}
 .cc select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px;-webkit-appearance:none;appearance:none}
 .cc:focus-within{border-color:var(--ink);box-shadow:0 0 0 4px var(--ring)}
@@ -289,7 +296,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .map{touch-action:none;cursor:grab}.map.drag{cursor:grabbing}.map.drag .tiles img{transition:none}
 .tiles img{position:absolute;width:256px;height:256px;max-width:none;opacity:0;transition:opacity .5s;filter:grayscale(1) contrast(.95) brightness(1.03)}
 .tiles img.ok{opacity:.92}
-@media (prefers-color-scheme: dark){.tiles img{filter:grayscale(1) invert(1) brightness(.78) contrast(.9)}}
+html[data-theme="dark"] .tiles img{filter:grayscale(1) invert(1) brightness(.78) contrast(.9)}
 .pin{position:absolute;left:50%;top:50%;width:34px;height:44px;margin:-44px 0 0 -17px}
 .loc.has .pin{animation:pinDrop .7s var(--ease) both .3s}
 .pin-body{fill:var(--ink);stroke:var(--surface);stroke-width:2}
@@ -367,6 +374,21 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .lang[hidden]{display:none}
 .lang button{min-width:44px;border:0;background:none;cursor:pointer;padding:0 10px;border-radius:999px;font-size:13px;font-weight:600;color:var(--muted)}
 .lang button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
+.theme{flex:none;position:relative;width:36px;height:36px;padding:0;border:1px solid var(--line-2);border-radius:999px;background-color:#F9FAFA;background-color:var(--surface);color:var(--ink);display:grid;place-items:center;box-shadow:0 1px 2px rgba(29,33,37,.06)}
+.theme svg{grid-area:1/1;width:18px;height:18px;transition:opacity .35s var(--ease),transform .35s var(--ease)}
+.theme .sun{opacity:1;transform:none}
+.theme .moon{opacity:0;transform:scale(.72) rotate(-18deg)}
+html[data-theme="dark"] .theme .sun{opacity:0;transform:scale(.72) rotate(18deg)}
+html[data-theme="dark"] .theme .moon{opacity:1;transform:none}
+@media (max-width:420px){
+  .top{gap:8px}
+  .top-r{gap:6px}
+  .brand{gap:8px;font-size:16px}
+  .lang{padding:2px}
+  .lang button{min-width:32px;padding:0 8px}
+  .region select{padding-inline:10px 26px;font-size:13px}
+  .theme{width:32px;height:32px}
+}
 [dir="rtl"] body{font-family:"IBM Plex Sans Arabic",var(--sans)}
 [dir="rtl"] .hero h1{letter-spacing:0;line-height:1.2}
 [dir="rtl"] .svc-main,[dir="rtl"] .svc-txt{text-align:right}
@@ -376,7 +398,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 [dir="rtl"] .h2,[dir="rtl"] .bar-amt,[dir="rtl"] .stage-est strong{letter-spacing:0}
 /* 3D house */
 .stage{position:relative}
-.gl3{position:relative;width:100%;display:block;touch-action:pan-y;-webkit-tap-highlight-color:transparent;outline:none;cursor:grab}
+.gl3{position:relative;width:100%;display:block;touch-action:pan-y;-webkit-tap-highlight-color:transparent;outline:none;cursor:grab;background-color:#E2E6E7;background-color:var(--stage);color-scheme:only light}
 .gl3:active{cursor:grabbing}
 .stage.gl-on .house{display:none}
 .stage.gl-on .gl3{animation:glIn .6s var(--ease) both}
@@ -392,6 +414,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
     </a>
     <div class="top-r">
       <div class="lang" id="langSw" role="group" aria-label="Language" hidden><button type="button" data-lang="en" lang="en" aria-pressed="false">EN</button><button type="button" data-lang="ar" lang="ar" aria-pressed="false">العربية</button></div>
+      <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Switch to dark theme"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.6"/><path d="M12 3.2v1.8M12 19v1.8M3.2 12h1.8M19 12h1.8M6.1 6.1l1.3 1.3M16.6 16.6l1.3 1.3M17.9 6.1l-1.3 1.3M7.4 16.6l-1.3 1.3"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.2 14.2A6.2 6.2 0 0 1 9.4 5.2 6.8 6.8 0 1 0 16.2 14.2z"/></svg></button>
       <label class="region"><span class="sr">Region and currency</span><select id="region"></select></label>
     </div>
   </header>
@@ -650,6 +673,7 @@ const AR = {
   'Share my location': 'شارك موقعي', 'Pin moved. Drag the map to adjust.': 'تم تحريك الدبوس. اسحب الخريطة للتعديل.', 'Adds a map pin to your message.': 'يضيف موقعك على الخريطة في رسالتك.',
   'Remove': 'إزالة', 'Your estimate': 'تقديرك', 'Demo page with sample prices.': 'صفحة تجريبية بأسعار للعرض.',
   'Region and currency': 'المنطقة والعملة', 'Country code': 'رمز الدولة',
+  'Switch to dark theme': 'حول إلى المظهر الداكن', 'Switch to light theme': 'حول إلى المظهر الفاتح',
   'Your home. Tap a part to add it to your quote.': 'بيتك. اضغط على أي جزء لإضافته لعرض السعر.',
   'Windows': 'الزجاج والنوافذ', 'Gutters': 'المزاريب', 'Solar panels': 'الألواح الشمسية',
   'Roof soft wash': 'غسيل السطح', 'Walls soft wash': 'غسيل الواجهات', 'Driveway': 'الممر والمواقف', 'Patio and paths': 'الحوش والممرات',
@@ -1337,6 +1361,18 @@ function setLoc(mode, msg) {
     else if (isAr()) locS.textContent = `دقة تقريبية ${Math.max(5, Math.round(a / 5) * 5)} م`;
     else if (r.units === 'ft') locS.textContent = `Accurate to about ${Math.max(10, Math.round(a * 3.28084 / 10) * 10)} ft`;
     else locS.textContent = `Accurate to about ${Math.max(5, Math.round(a / 5) * 5)} m`;
+    const revealMap = () => {
+      const mapEl = document.querySelector('.map');
+      if (!mapEl) return;
+      const bar = document.getElementById('bar');
+      const shown = bar && bar.classList.contains('show') && !bar.classList.contains('tuck') && getComputedStyle(bar).display !== 'none';
+      const barH = shown ? bar.getBoundingClientRect().height : 0;
+      const bottom = mapEl.getBoundingClientRect().bottom;
+      const limit = (window.innerHeight || 0) - barH - 10;
+      if (bottom > limit) window.scrollBy(0, Math.ceil(bottom - limit));
+    };
+    setTimeout(revealMap, 40);
+    setTimeout(revealMap, 560);
   } else if (mode === 'busy') {
     locT.textContent = tr('Finding you');
     locS.textContent = tr('Allow location when your phone asks.');
@@ -1543,6 +1579,7 @@ function applyLang() {
   nameIn.placeholder = tr('First name is fine'); phoneIn.placeholder = tr('Mobile number');
   ccSel.setAttribute('aria-label', tr('Country code'));
   svg.setAttribute('aria-label', tr('Your home. Tap a part to add it to your quote.'));
+  syncThemeButton();
   const langs = R().langs;
   langSw.hidden = !langs;
   langSw.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === state.lang));
@@ -1552,6 +1589,30 @@ function applyLang() {
   for (const el of [barAmt, stageAmt, sumAmt]) setMoney(el, el._cur || 0);
   update();
 }
+const themeBtn = $('#themeBtn');
+function syncThemeButton() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  themeBtn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+  themeBtn.setAttribute('aria-label', tr(dark ? 'Switch to light theme' : 'Switch to dark theme'));
+}
+function setTheme(theme) {
+  const dark = theme === 'dark';
+  const root = document.documentElement;
+  root.setAttribute('data-theme', dark ? 'dark' : 'light');
+  root.style.colorScheme = dark ? 'only dark' : 'only light';
+  const scheme = document.getElementById('colorSchemeMeta');
+  if (scheme) scheme.setAttribute('content', dark ? 'only dark' : 'only light');
+  const supported = document.getElementById('supportedSchemeMeta');
+  if (supported) supported.setAttribute('content', dark ? 'dark' : 'light');
+  const color = document.getElementById('themeColorMeta');
+  if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
+  try { localStorage.setItem('gleam.theme', dark ? 'dark' : 'light'); } catch (_) { /* ignore */ }
+  syncThemeButton();
+}
+themeBtn.addEventListener('click', () => setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+syncThemeButton();
+requestAnimationFrame(() => document.documentElement.classList.add('theme-ready'));
+
 langSw.addEventListener('click', e => {
   const b = e.target.closest('button[data-lang]');
   if (!b || b.dataset.lang === state.lang) return;
