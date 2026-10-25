@@ -12,7 +12,8 @@ const col = c => new THREE.Color(c.startsWith('rgba') ? c.replace(/rgba\(([^,]+)
 
 export function mount(host, opts = {}) {
   const probe = document.createElement('canvas');
-  const probeGl = probe.getContext('webgl2') || probe.getContext('webgl');
+  const probeAttrs = { alpha: false, antialias: false, powerPreference: 'high-performance' };
+  const probeGl = probe.getContext('webgl2', probeAttrs) || probe.getContext('webgl', probeAttrs);
   if (!probeGl) throw new Error('no webgl');
   const loseProbe = probeGl.getExtension('WEBGL_lose_context');
   if (loseProbe) loseProbe.loseContext();
@@ -21,8 +22,14 @@ export function mount(host, opts = {}) {
   canvas.className = 'gl3';
   canvas.setAttribute('aria-hidden', 'true');
   canvas.style.colorScheme = 'only light';
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance', stencil: false });
+  // Three r170 ignores the alpha flag and always requests alpha:true. Create the context
+  // here so the renderer is given the attributes we actually asked for.
+  const requestedGL = { alpha: false, antialias: true, depth: true, stencil: false, powerPreference: 'high-performance', premultipliedAlpha: true, preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false };
+  const glContext = canvas.getContext('webgl2', requestedGL);
+  if (!glContext) throw new Error('no webgl');
+  const renderer = new THREE.WebGLRenderer({ canvas, context: glContext, antialias: true, alpha: false, powerPreference: 'high-performance', stencil: false });
   const gl = renderer.getContext();
+  renderer.setClearAlpha(1);
   const gpuInfo = gl.getExtension('WEBGL_debug_renderer_info');
   const gpuName = gpuInfo ? String(gl.getParameter(gpuInfo.UNMASKED_RENDERER_WEBGL) || '') : '';
   const weakGpu = /swiftshader|llvmpipe|softpipe|software|microsoft basic render/i.test(gpuName);
@@ -53,24 +60,27 @@ export function mount(host, opts = {}) {
   scene.add(hemi, sun);
   const themeDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
   const stageCur = new THREE.Color(0xe2e6e7);
+  const STAGE_LIGHT = new THREE.Color(0xe2e6e7);
+  const STAGE_DARK = new THREE.Color(0x313940);
+  const HEMI_L = new THREE.Color(0xfff7f0), HEMI_D = new THREE.Color(0xfff4e8);
+  const GROUND_L = new THREE.Color(0xd0d8d6), GROUND_D = new THREE.Color(0x9aa4a8);
+  const SUN_L = new THREE.Color(0xffe4c4), SUN_D = new THREE.Color(0xffe8cc);
+  const groundU = { radius: { value: 6 } };
   scene.background = stageCur;
   scene.fog = new THREE.Fog(0xe2e6e7, 8000, 12000);
   let themeUntil = 0;
+  // 1 = light, 0 = dark, taken from the stage colour that is already on screen
+  function themeMix() {
+    const span = STAGE_LIGHT.r - STAGE_DARK.r;
+    return THREE.MathUtils.clamp(span ? (stageCur.r - STAGE_DARK.r) / span : 1, 0, 1);
+  }
   function applySceneTheme() {
-    const dark = themeDark();
-    if (dark) {
-      hemi.color.set(0xfff4e8);
-      hemi.groundColor.set(0x9aa4a8);
-      hemi.intensity = 3.05;
-      sun.color.set(0xffe8cc);
-      sun.intensity = 4.05;
-    } else {
-      hemi.color.set(0xfff7f0);
-      hemi.groundColor.set(0xd0d8d6);
-      hemi.intensity = 2.5;
-      sun.color.set(0xffe4c4);
-      sun.intensity = 3.35;
-    }
+    const t = themeMix();
+    hemi.color.copy(HEMI_D).lerp(HEMI_L, t);
+    hemi.groundColor.copy(GROUND_D).lerp(GROUND_L, t);
+    hemi.intensity = 3.05 + (2.5 - 3.05) * t;
+    sun.color.copy(SUN_D).lerp(SUN_L, t);
+    sun.intensity = 4.05 + (3.35 - 4.05) * t;
   }
   function sampleStage() {
     const raw = getComputedStyle(document.documentElement).getPropertyValue('--stage').trim();
@@ -78,15 +88,14 @@ export function mount(host, opts = {}) {
     else stageCur.set(themeDark() ? 0x313940 : 0xe2e6e7);
     renderer.setClearColor(stageCur, 1);
     scene.fog.color.copy(stageCur);
-    canvas.style.backgroundColor = '#' + stageCur.getHexString();
+    canvas.style.backgroundColor = raw || (themeDark() ? '#313940' : '#e2e6e7');
+    applySceneTheme();
   }
   function syncTheme() {
-    applySceneTheme();
     sampleStage();
-    themeUntil = performance.now() + 800;
+    themeUntil = performance.now() + 1200;
     draw();
   }
-  applySceneTheme();
   sampleStage();
   const themeObs = new MutationObserver(syncTheme);
   themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -176,11 +185,34 @@ export function mount(host, opts = {}) {
     const x0 = -(W + gw) / 2 + W / 2; // main body centre
     const front = Dp / 2;
 
-    // ground. Lawn top is y = 0. Every slab sits on its own step so no face shares that plane.
-    const lawn = new THREE.Mesh(new THREE.CylinderGeometry(radius = Math.max(5.2, (W + gw) * 0.9 + 1.5), radius, 0.12, 40), M(C.lawn, { roughness: 1, flatShading: false }));
+    // ground. A finite disc. The outer ring fades to the stage colour so the cream
+    // plate does not meet the panel as a hard edge in either theme.
+    radius = Math.max(5.2, (W + gw) * 0.9 + 1.5);
+    groundU.radius.value = radius;
+    const lawnMat = M(C.lawn, { roughness: 1, flatShading: false });
+    lawnMat.customProgramCacheKey = () => 'gleam-ground';
+    lawnMat.onBeforeCompile = shader => {
+      shader.uniforms.uStage = { value: stageCur };
+      shader.uniforms.uRadius = groundU.radius;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vGroundP;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundP = position.xy;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vGroundP;\nuniform vec3 uStage;\nuniform float uRadius;')
+        .replace('#include <fog_fragment>', `#include <fog_fragment>
+          float gDist = length(vGroundP) / max(uRadius, 0.001);
+          float gFade = smoothstep(0.72, 0.96, gDist);
+          vec3 stageLin = max(uStage, vec3(0.0));
+          vec3 stageSRGB = mix(stageLin * 12.92, 1.055 * pow(stageLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), stageLin));
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, stageSRGB, gFade);`);
+    };
+    const lawn = new THREE.Mesh(new THREE.CircleGeometry(radius, 64), lawnMat);
+    lawn.rotation.x = -Math.PI / 2;
+    lawn.position.y = -0.004;
     lawn.receiveShadow = true;
     lawn.castShadow = false;
-    lawn.position.y = -0.06; root.add(lawn);
+    lawn.userData.plate = radius;
+    root.add(lawn);
     const paveOf = mat => { mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -2; return mat; };
     const slab = (parent, w, h, d, mat, x, z, yBottom, order) => {
       const m = box(w, h, d, mat, x, yBottom + h / 2, z);
@@ -538,6 +570,15 @@ export function mount(host, opts = {}) {
     root.traverse(o => {
       if (!o.isMesh || !o.geometry) return;
       const geo = o.geometry;
+      if (o.userData.plate) {
+        const rad = o.userData.plate;
+        for (let k = 0; k < 24; k++) {
+          const ang = (k / 24) * Math.PI * 2;
+          corner.set(Math.cos(ang) * rad, Math.sin(ang) * rad, 0).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
+          pts.push(corner.x, corner.y, corner.z);
+        }
+        return;
+      }
       if (geo.type === 'CylinderGeometry') {
         const rad = Math.max(geo.parameters.radiusTop || 0, geo.parameters.radiusBottom || 0);
         const h = geo.parameters.height || 0;
@@ -704,6 +745,16 @@ export function mount(host, opts = {}) {
     coverage() { return projectSpan(0.88); },
     msaa: () => msaa,
     pixelRatio: () => renderer.getPixelRatio(),
+    contextAttributes() {
+      const a = gl.getContextAttributes() || {};
+      return {
+        requested: { alpha: false, antialias: true, powerPreference: 'high-performance', stencil: false },
+        alpha: !!a.alpha,
+        antialias: !!a.antialias,
+        powerPreference: a.powerPreference || '',
+        stencil: !!a.stencil,
+      };
+    },
     syncTheme,
     canvas,
     dispose() { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); themeObs.disconnect(); if (composer) composer.dispose(); renderer.dispose(); canvas.remove(); }
