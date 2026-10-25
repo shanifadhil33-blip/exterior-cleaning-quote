@@ -140,7 +140,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .caption{font-size:14px;font-weight:500;color:var(--ink-2);transition:opacity .16s ease}
 .caption.swap{opacity:0}
 .stage-est{display:none;align-items:baseline;gap:10px;white-space:nowrap}
-.stage-est span{font-size:13px;color:var(--muted)}
+.stage-est>span{font-size:13px;color:var(--muted)}
 .stage-est strong{font-size:22px;font-weight:650;letter-spacing:-.03em;font-variant-numeric:tabular-nums;transition:color .3s}
 .stage-est.zero strong{color:var(--faint)}
 
@@ -312,8 +312,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .line.soft .l,.line.soft .r{color:var(--muted)}
 .empty{font-size:15px;color:var(--muted)}
 .total{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
-.total span{padding-bottom:5px;font-size:15px;color:var(--muted)}
-.total strong{font-size:44px;line-height:1;letter-spacing:-.045em;font-weight:650;font-variant-numeric:tabular-nums}
+.total>span{padding-bottom:5px;font-size:15px;color:var(--muted)}
+.total strong{font-size:clamp(30px,10.5vw,44px);white-space:nowrap;line-height:1;letter-spacing:-.045em;font-weight:650;font-variant-numeric:proportional-nums}
 .note{margin:12px 0 18px;max-width:46ch;font-size:13.5px;color:var(--muted)}
 .btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:56px;padding:0 24px;border:0;border-radius:999px;background:var(--ink);color:var(--on-ink);font-size:16px;font-weight:600;white-space:nowrap;transition:transform .2s var(--ease),opacity .25s}
 .btn:active{transform:scale(.97)}
@@ -329,6 +329,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .bar-in{display:flex;align-items:center;gap:14px;max-width:640px;margin:0 auto}
 .bar-l{flex:1;min-width:0}
 .bar-k{font-size:12.5px;line-height:1.2;color:var(--muted)}
+.nsep{font-variant-numeric:normal;font-feature-settings:normal;letter-spacing:normal}
+.svc-price,.chip .p,.line .r{font-variant-numeric:proportional-nums}
 .bar-amt{display:block;font-size:26px;font-weight:650;line-height:1.15;letter-spacing:-.035em;font-variant-numeric:tabular-nums;transform-origin:left center}
 .bar-sub{font-size:12.5px;line-height:1.25;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar .btn{flex:none;width:auto;height:52px;padding:0 22px}
@@ -770,15 +772,25 @@ function totals() {
 }
 const ready = t => t.n > 0 && state.name.trim().length >= 2 && digits(state.phone) >= 7;
 
+/* digits keep a fixed width so the count up does not wobble, but separators and symbols
+   use their natural width, otherwise tabular figures leave a gap before the comma */
+function setMoney(el, n) {
+  const str = money(n), frag = document.createDocumentFragment();
+  for (const part of str.match(/\d+|\D+/g) || []) {
+    if (/^\d/.test(part)) frag.appendChild(document.createTextNode(part));
+    else { const sp = document.createElement('span'); sp.className = 'nsep'; sp.textContent = part; frag.appendChild(sp); }
+  }
+  el.replaceChildren(frag);
+}
 function tween(el, to) {
   const from = el._cur || 0;
   cancelAnimationFrame(el._raf);
-  if (reduced || from === to) { el._cur = to; el.textContent = money(to); return; }
+  if (reduced || from === to) { el._cur = to; setMoney(el, to); return; }
   const t0 = performance.now(), dur = 600;
   const step = now => {
     const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
     el._cur = Math.round(from + (to - from) * e);
-    el.textContent = money(el._cur);
+    setMoney(el, el._cur);
     if (p < 1) el._raf = requestAnimationFrame(step);
   };
   el._raf = requestAnimationFrame(step);
@@ -1525,7 +1537,7 @@ function applyLang() {
   [['.hero h1', 'Your price, before anyone visits.'], ['#hSvc', 'What needs cleaning'], ['#hDet', 'Your details'],
    ['#nameLbl', 'Your name'], ['#hPhone', 'Mobile number'], ['#hDay', 'Preferred day'], ['#hTime', 'Time of day'],
    ['#locX', 'Remove'], ['#hSum', 'Your estimate'], ['.foot', 'Demo page with sample prices.'],
-   ['.stage-est span', 'Estimate'], ['.bar-k', 'Estimate'], ['.total span', 'Estimate'], ['.region .sr', 'Region and currency']
+   ['.stage-est>span', 'Estimate'], ['.bar-k', 'Estimate'], ['.total>span', 'Estimate'], ['.region .sr', 'Region and currency']
   ].forEach(([q, k]) => { const el = $(q); if (el) el.textContent = tr(k); });
   $('#hSize').textContent = tr(sizeKeys().includes('S') ? 'Home size' : 'Home type');
   nameIn.placeholder = tr('First name is fine'); phoneIn.placeholder = tr('Mobile number');
@@ -1537,7 +1549,7 @@ function applyLang() {
   caption.textContent = tr('Tap any part of your home to add it');
   renderSizes(); renderTimes(); renderCountries(); renderList(); renderDays();
   setLoc(state.loc ? 'has' : 'idle');
-  for (const el of [barAmt, stageAmt, sumAmt]) el.textContent = money(el._cur || 0);
+  for (const el of [barAmt, stageAmt, sumAmt]) setMoney(el, el._cur || 0);
   update();
 }
 langSw.addEventListener('click', e => {
