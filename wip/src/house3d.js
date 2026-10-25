@@ -12,27 +12,67 @@ export function mount(host, opts = {}) {
   const canvas = document.createElement('canvas');
   canvas.className = 'gl3';
   canvas.setAttribute('aria-hidden', 'true');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'low-power' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1.02;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(30, 1.5, 0.1, 100);
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x9aa2a6, 1.6);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.9);
-  sun.position.set(4, 8, 6);
+  const hemi = new THREE.HemisphereLight(0xfff7f0, 0xd0d8d6, 2.5);
+  const sun = new THREE.DirectionalLight(0xffe4c4, 3.35);
+  sun.position.set(5.2, 9.4, 6.6);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(512, 512);
+  sun.shadow.camera.near = 2;
+  sun.shadow.camera.far = 28;
+  sun.shadow.camera.left = -7.5;
+  sun.shadow.camera.right = 7.5;
+  sun.shadow.camera.top = 7.5;
+  sun.shadow.camera.bottom = -7.5;
+  sun.shadow.bias = -0.0003;
+  sun.shadow.normalBias = 0.02;
+  sun.shadow.radius = 2.5;
   scene.add(hemi, sun);
+  const themeDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
+  const stageTarget = new THREE.Color();
+  const stageCur = new THREE.Color();
+  function applySceneTheme() {
+    const dark = themeDark();
+    stageTarget.set(dark ? 0x0e1215 : 0xe2e6e7);
+    if (dark) {
+      hemi.color.set(0xfff4e8);
+      hemi.groundColor.set(0x9aa4a8);
+      hemi.intensity = 3.05;
+      sun.color.set(0xffe8cc);
+      sun.intensity = 4.05;
+    } else {
+      hemi.color.set(0xfff7f0);
+      hemi.groundColor.set(0xd0d8d6);
+      hemi.intensity = 2.5;
+      sun.color.set(0xffe4c4);
+      sun.intensity = 3.35;
+    }
+  }
+  applySceneTheme();
+  stageCur.copy(stageTarget);
+  renderer.setClearColor(stageCur, 1);
+  new MutationObserver(applySceneTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   const pivot = new THREE.Group();
   scene.add(pivot);
   let root = new THREE.Group();
   pivot.add(root);
 
   let parts = {}, fxList = [], spec = null, sel = {}, radius = 6;
-  const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
-  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: col(c), roughness: 0.85, metalness: 0, flatShading: true, ...o });
+  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: col(c), roughness: 0.8, metalness: 0, flatShading: true, ...o });
 
   function box(w, h, d, mat, x, y, z) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y, z);
+    m.castShadow = true;
+    m.receiveShadow = true;
     return m;
   }
   function part(id) {
@@ -73,13 +113,13 @@ export function mount(host, opts = {}) {
     pivot.add(root);
     parts = {}; fxList = [];
     const r = rnd(s.seed || 7);
-    const D = dark();
     const C = {
-      wall: css('--h-wall'), wallDirty: D ? '#2b2a26' : '#d9d2c0', roof: css('--h-roof'), roofDirty: D ? '#23231c' : '#6c6a55',
-      glass: D ? '#5d7078' : '#cfe0e8', glassDirty: D ? '#3a3a33' : '#a49c86', door: css('--h-door'), pave: css('--h-pave'),
-      paveDirty: D ? '#1f1d18' : '#a39b88', gut: css('--h-gutter'), gutDirty: D ? '#34322b' : '#bdb59f', lawn: css('--h-lawn'),
-      moss: D ? '#4d5a3c' : '#7f8f5a', leaf: D ? '#6c5a3c' : '#9a7a4c', streak: D ? '#000000' : '#4a4337', grime: css('--h-grime'),
-      panel: D ? '#0f1a24' : '#26384a', panelDirty: D ? '#3a372e' : '#9b937c', tree: css('--h-tree'), nb: D ? '#2a3034' : '#dfe3e4'
+      wall: '#f7f8f8', wallDirty: '#d2c4ac', roof: '#c5d0d6', roofDirty: '#746e58',
+      glass: '#d5e4ec', glassDirty: '#c2b396', door: css('--h-door'), pave: '#dce2e3',
+      paveDirty: '#b3a68e', gut: '#e7eeef', gutDirty: '#b5a78c', lawn: '#dce3e4',
+      moss: '#87985e', leaf: '#a07e4e', streak: '#5a5144', grime: '#8a7c64',
+      panel: '#3e5568', panelDirty: '#b3a68a', tree: '#d3dbdd', nb: '#e4e9ea',
+      frame: '#d3dce0', garage: '#c5ced3'
     };
     const flat = s.roof === 'flat';
     const FH = 1.0, H = s.floors * FH, bay = 1.0;
@@ -89,11 +129,12 @@ export function mount(host, opts = {}) {
     const front = Dp / 2;
 
     // ground
-    const lawn = new THREE.Mesh(new THREE.CylinderGeometry(radius = Math.max(5.2, (W + gw) * 0.9 + 1.5), radius, 0.12, 40), M(C.lawn));
+    const lawn = new THREE.Mesh(new THREE.CylinderGeometry(radius = Math.max(5.2, (W + gw) * 0.9 + 1.5), radius, 0.12, 40), M(C.lawn, { roughness: 1 }));
+    lawn.receiveShadow = true;
     lawn.position.y = -0.06; root.add(lawn);
 
     // neighbours, so semi detached and terraced homes read right
-    const nbMat = M(C.nb), nbRoof = M(D ? '#1a1e21' : '#8c959a');
+    const nbMat = M(C.nb), nbRoof = M('#c9d2d6');
     const neighbour = side => {
       const nx = side * (W / 2 + W / 2) + x0;
       root.add(box(W, H, Dp, nbMat, nx, H / 2, 0));
@@ -105,7 +146,7 @@ export function mount(host, opts = {}) {
 
     // walls
     const pw = part('walls');
-    const wallMat = dirtyMat(pw, C.wallDirty, C.wall);
+    const wallMat = dirtyMat(pw, C.wallDirty, C.wall, { roughness: 0.76 });
     pw.g.add(box(W, H, Dp, wallMat, x0, H / 2, 0));
     if (gw) pw.g.add(box(gw, 1.0, Dp * 0.85, wallMat, x0 + W / 2 + gw / 2, 0.5, -Dp * 0.075));
     if (s.apt) for (let f = 1; f < s.floors; f++) pw.g.add(box(W + 0.12, 0.06, Dp + 0.12, wallMat, x0, f * FH, 0));
@@ -121,12 +162,12 @@ export function mount(host, opts = {}) {
 
     // door
     root.add(box(0.5, 0.82, 0.05, M(C.door), x0 + (s.bays > 2 ? 0 : -W / 4 + 0.1), 0.41, front + 0.02));
-    if (gw) root.add(box(gw - 0.25, 0.75, 0.04, M(D ? '#22282c' : '#c8cfd2'), x0 + W / 2 + gw / 2, 0.375, front - Dp * 0.075 * 2 + 0.02));
+    if (gw) root.add(box(gw - 0.25, 0.75, 0.04, M(C.garage), x0 + W / 2 + gw / 2, 0.375, front - Dp * 0.075 * 2 + 0.02));
 
     // windows
     const pwin = part('windows');
-    const glassMat = dirtyMat(pwin, C.glassDirty, C.glass, { roughness: 0.25, metalness: 0.1, emissive: col('#000000') });
-    const frameMat = M(C.wall);
+    const glassMat = dirtyMat(pwin, C.glassDirty, C.glass, { roughness: 0.16, metalness: 0.04, emissive: col('#000000') });
+    const frameMat = M(C.frame);
     const doorBay = s.bays > 2 ? Math.floor(s.bays / 2) : 0;
     for (let f = 0; f < s.floors; f++) {
       for (let b = 0; b < s.bays; b++) {
@@ -146,7 +187,7 @@ export function mount(host, opts = {}) {
 
     // roof
     const pr = part('roof');
-    const roofMat = dirtyMat(pr, C.roofDirty, C.roof);
+    const roofMat = dirtyMat(pr, C.roofDirty, C.roof, { roughness: 0.78 });
     const RH = 0.85, RD = Dp + 0.3, RW = W + 0.3;
     let slope = 0;
     if (flat) {
@@ -180,7 +221,7 @@ export function mount(host, opts = {}) {
     // solar panels on the sunny side of the roof
     const ps = part('solar');
     const panelMat = dirtyMat(ps, C.panelDirty, C.panel, { roughness: 0.3, metalness: 0.3 });
-    const frame = M(D ? '#59636a' : '#c7cdd0');
+    const frame = M('#d5dcde');
     const n = Math.max(2, Math.min(s.bays, 4));
     const arr = new THREE.Group();
     for (let i = 0; i < n; i++) {
@@ -245,7 +286,7 @@ export function mount(host, opts = {}) {
     // a tree for scale when there are no neighbours
     if (!s.neigh) {
       const t = new THREE.Group();
-      t.add(box(0.1, 0.7, 0.1, M(D ? '#3a3f42' : '#9aa1a4'), 0, 0.35, 0));
+      t.add(box(0.1, 0.7, 0.1, M('#b4bcc0'), 0, 0.35, 0));
       const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 0), M(C.tree)); crown.position.y = 1.05; t.add(crown);
       t.position.set(-(W + gw) / 2 - 0.9, 0, 0.6); root.add(t);
     }
@@ -265,12 +306,18 @@ export function mount(host, opts = {}) {
     sh.moveTo(-d / 2, 0); sh.lineTo(d / 2, 0); sh.lineTo(0, h); sh.closePath();
     const g = new THREE.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false });
     g.translate(0, 0, -w / 2); g.rotateY(Math.PI / 2);
-    return new THREE.Mesh(g, mat);
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
   }
   function hip(w, d, h, mat) {
     const g = new THREE.ConeGeometry(Math.SQRT1_2, 1, 4, 1);
     g.rotateY(Math.PI / 4); g.translate(0, 0.5, 0); g.scale(w, h, d);
-    return new THREE.Mesh(g, mat);
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
   }
 
   function applyClean(p) {
@@ -389,16 +436,25 @@ export function mount(host, opts = {}) {
     raf = requestAnimationFrame(loop);
     if ((vis++ % 20) === 0) checkVis();
     if (!visible || document.hidden) { last = now; return; }
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const elapsed = Math.min(0.25, (now - last) / 1000);
+    const dt = Math.min(0.05, elapsed); last = now;
     frames.push(now); if (frames.length > 90) frames.shift();
     Object.values(parts).forEach(p => {
       if (p.clean !== p.target) {
-        const sp = dt / (p.target ? 1.1 : 0.5);
+        const sp = elapsed / (p.target ? 1.1 : 0.5);
         p.clean = p.target > p.clean ? Math.min(p.target, p.clean + sp) : Math.max(p.target, p.clean - sp);
         applyClean(p);
       }
     });
     stepFx(now, dt);
+    const stageGap = Math.abs(stageCur.r - stageTarget.r) + Math.abs(stageCur.g - stageTarget.g) + Math.abs(stageCur.b - stageTarget.b);
+    if (stageGap > 0.004) {
+      stageCur.lerp(stageTarget, Math.min(1, dt * 5));
+      renderer.setClearColor(stageCur, 1);
+    } else if (stageGap > 0) {
+      stageCur.copy(stageTarget);
+      renderer.setClearColor(stageCur, 1);
+    }
     if (!drag && !reduced && now - lastInput > 2500) rot += (Math.sin(now / 4200) * 0.32 - rot) * Math.min(1, dt * 0.8);
     pivot.rotation.y = rot;
     renderer.render(scene, camera);
