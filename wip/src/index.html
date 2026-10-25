@@ -363,7 +363,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .top-r{display:flex;align-items:center;gap:8px}
 .lang{display:inline-flex;height:36px;padding:3px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface)}
 .lang[hidden]{display:none}
-.lang button{min-width:44px;padding:0 10px;border-radius:999px;font-size:13px;font-weight:600;color:var(--muted)}
+.lang button{min-width:44px;border:0;background:none;cursor:pointer;padding:0 10px;border-radius:999px;font-size:13px;font-weight:600;color:var(--muted)}
 .lang button[aria-pressed="true"]{background:var(--ink);color:var(--on-ink)}
 [dir="rtl"] body{font-family:"IBM Plex Sans Arabic",var(--sans)}
 [dir="rtl"] .hero h1{letter-spacing:0;line-height:1.2}
@@ -389,7 +389,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
       <span id="brandName">Gleam</span>
     </a>
     <div class="top-r">
-      <div class="lang" id="langSw" role="group" aria-label="Language" hidden><button type="button" data-lang="ar" lang="ar" aria-pressed="false">عربي</button><button type="button" data-lang="en" lang="en" aria-pressed="false">EN</button></div>
+      <div class="lang" id="langSw" role="group" aria-label="Language" hidden><button type="button" data-lang="en" lang="en" aria-pressed="false">EN</button><button type="button" data-lang="ar" lang="ar" aria-pressed="false">العربية</button></div>
       <label class="region"><span class="sr">Region and currency</span><select id="region"></select></label>
     </div>
   </header>
@@ -577,7 +577,7 @@ const CONFIG = {
       } },
     // Saudi Arabia: Arabic first, with an English switch. Solar is priced at SAR 35 to 45 a panel.
     SA: { label: 'SA SAR', currency: 'SAR', locale: 'en-SA', minimum: 250, units: 'm',
-      booking: 'whatsapp', country: 'SA', sizes: ['VS', 'VM', 'VL', 'DUP', 'APT'], langs: ['ar', 'en'],
+      booking: 'whatsapp', country: 'SA', sizes: ['VS', 'VM', 'VL', 'DUP', 'APT'], langs: ['en', 'ar'],
       words: { pipes: 'drain pipes', walls: 'Stone, paint or marble' },
       prices: {
         windows:       { VS: 350, VM: 900, VL: 2000, DUP: 1100, APT: 350 },
@@ -1542,11 +1542,13 @@ langSw.addEventListener('click', e => {
   const b = e.target.closest('button[data-lang]');
   if (!b || b.dataset.lang === state.lang) return;
   state.lang = b.dataset.lang; state.langPicked = true;
+  try { localStorage.setItem('gleam.lang', state.lang); } catch (_) { /* ignore */ }
   applyLang();
 });
 
 /* ---------- start ---------- */
 state.region = detectRegion();
+try { const sl = localStorage.getItem('gleam.lang'); if (sl && (R().langs || []).includes(sl)) { state.lang = sl; state.langPicked = true; } } catch (_) { /* ignore */ }
 try { const ql = new URLSearchParams(location.search).get('lang'); if (ql && (R().langs || []).includes(ql)) { state.lang = ql; state.langPicked = true; } } catch (_) { /* ignore */ }
 pickLang();
 if (!sizeKeys().includes(state.size)) state.size = swapSize(state.size);

@@ -13,7 +13,8 @@ const MARKETS = [
   { path: '/ie/', region: 'IE', scheme: 'wa', dial: '+353', btn: 'Book on WhatsApp' },
   { path: '/au/', region: 'AU', scheme: 'wa', dial: '+61', btn: 'Book on WhatsApp' },
   { path: '/nz/', region: 'NZ', scheme: 'sms', dial: '+64', btn: 'Text us' },
-  { path: '/sa/', region: 'SA', scheme: 'wa', dial: '+966', btn: 'احجز على واتساب', ar: true },
+  { path: '/sa/', region: 'SA', scheme: 'wa', dial: '+966', btn: 'Book on WhatsApp', sa: true },
+  { path: '/sa/', region: 'SA', scheme: 'wa', dial: '+966', btn: 'احجز على واتساب', ar: true, sa: true, key: 'sa-ar' },
   { path: '/', region: 'US', scheme: 'sms', dial: '+1', btn: 'Text us', tz: 'America/New_York' },
 ];
 const SERVICES = ['windows', 'solar', 'gutters', 'roof', 'walls', 'driveway', 'patio'];
@@ -41,7 +42,8 @@ const amount = page => page.evaluate(() => document.querySelector('#sumAmt').tex
 const num = s => Number(s.replace(/[^\d]/g, ''));
 
 for (const mk of MARKETS) for (const w of WIDTHS) {
-  const tag = `${mk.path} ${w}`;
+  const tag = `${mk.key || mk.path} ${w}`;
+  const fk = mk.key || (mk.path.replace(/\//g, '') || 'root');
   const phone = w < 960;
   const ctx = await browser.newContext({ viewport: { width: w, height: phone ? 800 : 900 }, deviceScaleFactor: phone ? 2 : 1, hasTouch: phone, isMobile: phone, timezoneId: mk.tz || 'Asia/Dubai', permissions: ['geolocation'], geolocation: { latitude: 51.5007, longitude: -0.1246 } });
   await ctx.addInitScript(() => {
@@ -53,19 +55,26 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
   const res = await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
   ok(res.status() === 200, `${tag} status ${res.status()}`);
+  if (mk.sa && !mk.ar) ok(await page.evaluate(() => document.documentElement.dir === 'ltr' && document.documentElement.lang === 'en'), `${tag} SA defaults to English`);
+  if (mk.ar) {
+    await page.locator('#langSw button[data-lang="ar"]').click(); await sleep(400);
+    await page.reload({ waitUntil: 'networkidle' });
+    ok(await page.evaluate(() => document.documentElement.dir === 'rtl'), `${tag} Arabic choice remembered after reload`);
+  }
   ok(await page.$eval('#region', e => e.value) === mk.region, `${tag} region`);
   await page.waitForFunction(() => window.__h3d || window.__h3dError, null, { timeout: 20000 }).catch(() => {});
   ok(await page.evaluate(() => !!window.__h3d && document.querySelector('.stage').classList.contains('gl-on')), `${tag} 3D house loaded ${await page.evaluate(() => window.__h3dError || '')}`);
   await sleep(1800);
   ok(await page.evaluate(() => document.documentElement.dir) === (mk.ar ? 'rtl' : 'ltr'), `${tag} text direction`);
   if (phone) { const f = await page.evaluate(() => window.__h3d && window.__h3d.fps()); ok(f >= 24, `${tag} phone fps ${f}`); fpsLog.push(`${tag} ${f}`); }
-  await page.screenshot({ path: `${OUT}/${mk.path.replace(/\//g, '') || 'root'}-${w}-1-start.png` });
+  await page.screenshot({ path: `${OUT}/${fk}-${w}-1-start.png` });
   await noSideScroll(page, tag + ' start');
   await dashCheck(page, tag + ' start');
   ok((await page.$eval('#cc', e => e.value)) && (await page.$eval('#ccShow', e => e.textContent)).endsWith(mk.dial), `${tag} default code ${mk.dial}`);
   const sizes = await page.$$eval('#sizeSeg button .t', b => b.map(x => x.textContent));
   if (mk.region === 'UK' || mk.region === 'IE') ok(sizes.join(',') === 'Detached,Semi detached,Terraced,Bungalow', `${tag} UK types ${sizes}`);
   else if (mk.ar) ok(sizes.join(',') === 'فيلا صغيرة,فيلا متوسطة,فيلا كبيرة,دوبلكس,شقة', `${tag} SA types ${sizes}`);
+  else if (mk.sa) ok(sizes.join(',') === 'Small villa,Medium villa,Large villa,Duplex,Apartment', `${tag} SA EN types ${sizes}`);
   else ok(sizes.length === 3, `${tag} sizes`);
   // every home type changes the windows price and the house
   const prices = [];
@@ -75,7 +84,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     prices.push(await page.$eval('.svc[data-id="windows"] .svc-price', e => e.textContent));
     ok(await page.evaluate(() => window.__h3d && window.__h3d.parts().length) === 7, `${tag} 3D parts ${sizes[i]}`);
     await noSideScroll(page, `${tag} size ${sizes[i]}`);
-    if (w === 390 && ['UK', 'SA', 'US'].includes(mk.region)) { await sleep(300); await page.locator('.stage').screenshot({ path: `${OUT}/${mk.region.toLowerCase()}-390-house-${i}.png` }); }
+    if (w === 390 && ['UK', 'SA', 'US'].includes(mk.region) && !(mk.sa && !mk.ar)) { await sleep(300); await page.locator('.stage').screenshot({ path: `${OUT}/${mk.region.toLowerCase()}-390-house-${i}.png` }); }
   }
   ok(new Set(prices).size >= 3, `${tag} prices scale by home ${prices}`);
   await page.locator('#sizeSeg button').nth(1).click(); await sleep(200);
@@ -98,7 +107,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     await sleep(1500);
     const dirt = await page.evaluate(id => window.__h3d.dirt(id), id);
     ok(dirt === 0, `${tag} ${id} grime cleaned on 3D house (${dirt})`);
-    if (id === 'roof' && w === 390) await page.locator('.stage').screenshot({ path: `${OUT}/${mk.region.toLowerCase()}-390-wash-roof.png` });
+    if (id === 'roof' && w === 390) await page.locator('.stage').screenshot({ path: `${OUT}/${fk}-390-wash-roof.png` });
     const a = num(await amount(page));
     ok(a !== last, `${tag} ${id} price changed ${last}->${a}`);
     last = a;
@@ -108,7 +117,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   await page.locator('.svc[data-id="windows"] .chip').first().click(); await sleep(700);
   ok(num(await amount(page)) !== last, `${tag} inside windows changes price`);
   await page.evaluate(() => scrollTo(0, 0)); await sleep(500);
-  await page.screenshot({ path: `${OUT}/${mk.path.replace(/\//g, '') || 'root'}-${w}-2-clean.png` });
+  await page.screenshot({ path: `${OUT}/${fk}-${w}-2-clean.png` });
   if (phone) ok(await page.$eval('#bar', e => e.classList.contains('show')), `${tag} price bar shows`);
   // form
   await page.locator('#name').scrollIntoViewIfNeeded();
@@ -130,7 +139,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   if (osmVis) ok(/OpenStreetMap contributors/.test(await page.$eval('#osm', e => e.textContent)), `${tag} OSM attribution`);
   await sleep(600);
   await page.locator('#summary').scrollIntoViewIfNeeded(); await sleep(500);
-  await page.screenshot({ path: `${OUT}/${mk.path.replace(/\//g, '') || 'root'}-${w}-3-form.png` });
+  await page.screenshot({ path: `${OUT}/${fk}-${w}-3-form.png` });
   await noSideScroll(page, tag + ' form');
   await dashCheck(page, tag + ' form');
   const btnTxt = await page.$eval('#sumBtn', e => e.textContent.trim());
@@ -155,7 +164,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   ok(mk.scheme === 'sms' ? !body.includes('*') : body.includes(mk.ar ? '*التقدير' : '*Estimate'), `${tag} message formatting`);
   if (mk.ar) ok(!/[A-Za-z]{3,}/.test(body.replace(/https?:\S+/g, '').replace('Yusuf', '')), `${tag} message all Arabic`);
   ok(!DASH.test(body.replace(/https?:\S+/g, '')), `${tag} no dash in message`);
-  messages[mk.path] = body;
+  messages[mk.key || mk.path] = body;
   if (mk.ar) {
     // English switch on the Saudi page
     await page.evaluate(() => scrollTo(0, 0)); await sleep(2500); await page.locator('#langSw button[data-lang="en"]').click(); await sleep(700);
@@ -172,7 +181,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     ok(await page.evaluate(() => document.documentElement.dir) === 'rtl', `${tag} back to Arabic`);
   }
   ok(errs.length === 0, `${tag} page errors ${errs.join(';')}`);
-  await page.screenshot({ path: `${OUT}/${mk.path.replace(/\//g, '') || 'root'}-${w}-4-full.png`, fullPage: true });
+  await page.screenshot({ path: `${OUT}/${fk}-${w}-4-full.png`, fullPage: true });
   await ctx.close();
 }
 // root guesses, and ?region= still works
@@ -186,18 +195,19 @@ for (const [tz, q, exp] of [['Europe/London', '', 'UK'], ['Australia/Sydney', ''
 for (const mk of MARKETS) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 }, timezoneId: mk.tz || 'Asia/Dubai' });
   await ctx.addInitScript(() => { window.__links = []; const o = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (/^(sms:|https:\/\/wa\.me)/.test(this.href)) { window.__links.push(this.href); return; } return o.call(this); }; navigator.geolocation.getCurrentPosition = (s, e) => setTimeout(() => e({ code: 1, message: 'denied' }), 50); });
+  if (mk.ar) await ctx.addInitScript(() => localStorage.setItem('gleam.lang', 'ar'));
   const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
   await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
   await page.locator('.svc[data-id="gutters"] .svc-main').click();
   await page.fill('#name', 'Omar'); await page.fill('#phone', '0412345678');
   await page.locator('#locBtn').click(); await sleep(400);
   const s = await page.$eval('#locS', e => e.textContent);
-  ok(!(await page.$eval('#loc', e => e.classList.contains('has'))) && (mk.ar ? /تقدر تحجز/.test(s) : /still book/.test(s)), `${mk.path} denied note "${s}"`);
+  ok(!(await page.$eval('#loc', e => e.classList.contains('has'))) && (mk.ar ? /تقدر تحجز/.test(s) : /still book/.test(s)), `${mk.key || mk.path} denied note "${s}"`);
   await page.locator('#sumBtn').click(); await sleep(300);
   const h = await page.evaluate(() => window.__links[0] || '');
-  ok(h.startsWith(mk.scheme === 'sms' ? 'sms:+971500000000' : 'https://wa.me/971500000000') && !decodeURIComponent(h).includes('maps.google'), `${mk.path} denied still books`);
-  ok(errs.length === 0, `${mk.path} denied errors ${errs}`);
-  if (mk.path === '/us/' || mk.path === '/sa/') await page.screenshot({ path: `${OUT}/${mk.path.replace(/\//g, '')}-390-location-denied.png` });
+  ok(h.startsWith(mk.scheme === 'sms' ? 'sms:+971500000000' : 'https://wa.me/971500000000') && !decodeURIComponent(h).includes('maps.google'), `${mk.key || mk.path} denied still books`);
+  ok(errs.length === 0, `${mk.key || mk.path} denied errors ${errs}`);
+  if (mk.path === '/us/' || mk.sa) await page.screenshot({ path: `${OUT}/${mk.key || mk.path.replace(/\//g, '')}-390-location-denied.png` });
   await ctx.close();
 }
 // fallback: without WebGL or with the 3D script blocked, the drawn house still works

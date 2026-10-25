@@ -54,7 +54,7 @@ A production version of Claude's demo in `claude-v1/index.html`. Keep its look a
 - Bundle: 3 or more services saves 10%. Each market has a minimum visit charge.
 
 ## Saudi Arabia
-- Arabic is the default, with an EN toggle and a full right to left layout.
+- English is the default, with a clear switch to Arabic. Arabic turns on a full right to left layout and an Arabic WhatsApp message. The choice is remembered (localStorage `gleam.lang`). The same rule applies to any future market with a native language.
 - Use natural Gulf or Saudi Arabic, with no dashes.
 - Prices are in SAR. Dates use the Gregorian calendar with Western digits.
 
