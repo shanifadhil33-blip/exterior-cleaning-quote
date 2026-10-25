@@ -674,6 +674,8 @@ const AR = {
   'Gleam | Instant exterior cleaning quote': 'جليم | عرض سعر فوري لتنظيف الواجهات',
   'Build your exterior cleaning quote on your own home and book it by text or WhatsApp.': 'جهز عرض سعر تنظيف بيتك من الخارج واحجز على واتساب.'
 };
+/* site root, so the page also works under a sub path such as GitHub Pages */
+const SITE_BASE = location.pathname.replace(/(us|uk|ie|ca|au|sa|nz)\/?(index\.html)?$/i, '').replace(/index\.html$/i, '').replace(/[^/]*$/, '');
 const isAr = () => state.lang === 'ar';
 const tr = x => (isAr() && AR[x]) || x;
 const LOC = () => isAr() ? 'ar-SA-u-ca-gregory-nu-latn' : R().locale;
@@ -1010,7 +1012,7 @@ let H3 = null;
 const spec3d = () => { const z = SIZES[state.size]; return { floors: z.floors, bays: z.bays, garage: z.garage, neigh: z.neigh || null, roof: z.roof || 'pitched', apt: !!z.apt, seed: z.seed }; };
 function load3d() {
   if (new URLSearchParams(location.search).has('flat')) return;
-  import('/house3d.js').then(m => {
+  import(SITE_BASE + 'house3d.js').then(m => {
     const stage = svg.parentElement;
     H3 = m.mount(stage, { onTap: id => toggle(id) });
     stage.insertBefore(H3.canvas, svg);
@@ -1338,7 +1340,7 @@ function detectRegion() {
   try { q = (new URLSearchParams(location.search).get('region') || '').toUpperCase(); } catch (_) { /* ignore */ }
   if (q === 'GB') q = 'UK';
   if (CONFIG.regions[q]) return q;
-  const m = location.pathname.match(/^\/(us|uk|ie|ca|au|sa|nz)(\/|$)/i);
+  const m = location.pathname.match(/\/(us|uk|ie|ca|au|sa|nz)(\/|\/index\.html)?$/i);
   if (m && CONFIG.regions[m[1].toUpperCase()]) return m[1].toUpperCase();
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
@@ -1485,8 +1487,8 @@ ccSel.addEventListener('change', () => { state.cc = ccSel.value; state.ccTouched
 regionSel.addEventListener('change', () => {
   state.region = regionSel.value;
   if (!sizeKeys().includes(state.size)) { state.size = swapSize(state.size); renderHouse(true); }
-  if (/^\/(us|uk|ie|ca|au|sa|nz)\/?$/i.test(location.pathname) || location.search) {
-    try { history.replaceState(null, '', '/' + state.region.toLowerCase() + '/'); } catch (_) { /* ignore */ }
+  if (/\/(us|uk|ie|ca|au|sa|nz)\/?$/i.test(location.pathname) || location.search) {
+    try { history.replaceState(null, '', SITE_BASE + state.region.toLowerCase() + '/'); } catch (_) { /* ignore */ }
   }
   pickLang();
   applyLang();
