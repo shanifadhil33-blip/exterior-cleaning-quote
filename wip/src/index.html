@@ -25,6 +25,9 @@
 <title>Gleam | Instant exterior cleaning quote</title>
 <meta name="description" content="Build your exterior cleaning quote on your own home and book it by text or WhatsApp.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231D2125'/%3E%3Cpath d='M6 23l7.5-12 4.2 6.4 2.8-3.8L26 23' fill='none' stroke='%23F9FAFA' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" } }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
@@ -144,8 +147,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .stage{background:var(--stage);border-radius:32px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line),0 26px 40px -32px rgba(29,33,37,.5)}
 .house{display:block;width:100%;height:auto;max-height:38vh;max-height:38svh;margin:0 auto;padding-top:8px;overflow:visible;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
 .stage-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px 14px;min-height:44px}
-.caption{font-size:14px;font-weight:500;color:var(--ink-2);transition:opacity .16s ease;min-width:0;line-height:1.35}
-.caption.swap{opacity:0}
+.caption{font-size:14px;font-weight:500;color:var(--ink-2);transition:opacity .2s ease,transform .2s ease;min-width:0;line-height:1.35;min-height:2.8em;display:flex;align-items:center;transform:translateY(0)}
+.caption.swap{opacity:0;transform:translateY(5px)}
 .stage-est{display:none;align-items:baseline;gap:10px;white-space:nowrap}
 .stage-est>span{font-size:13px;color:var(--muted)}
 .stage-est strong{font-size:22px;font-weight:650;letter-spacing:-.03em;font-variant-numeric:tabular-nums;transition:color .3s}
@@ -398,10 +401,10 @@ html[data-theme="dark"] .theme .moon{opacity:1;transform:none}
 [dir="rtl"] .h2,[dir="rtl"] .bar-amt,[dir="rtl"] .stage-est strong{letter-spacing:0}
 /* 3D house */
 .stage{position:relative}
-.gl3{position:relative;width:100%;display:block;touch-action:pan-y;-webkit-tap-highlight-color:transparent;outline:none;cursor:grab;background-color:#E2E6E7;background-color:var(--stage);color-scheme:only light}
+.gl3{position:relative;width:100%;display:block;touch-action:pan-y;-webkit-tap-highlight-color:transparent;outline:none;cursor:grab;background-color:#E2E6E7;background-color:var(--stage);color-scheme:only light;opacity:0}
 html[data-theme="dark"] .stage{box-shadow:inset 0 0 0 1px rgba(244,246,247,.16), 0 18px 36px -20px rgba(0,0,0,.72)}
-html[data-theme="dark"] .caption{display:inline-block;max-width:100%;padding:6px 12px;border-radius:999px;background:rgba(244,246,247,.10)}
-html[data-theme="dark"] .gl3{color-scheme:only dark}
+html[data-theme="dark"] .caption{align-self:center;width:fit-content;max-width:100%;padding:6px 12px;border-radius:999px;background:rgba(244,246,247,.10)}
+html[data-theme="dark"] .gl3{color-scheme:only light}
 .gl3:active{cursor:grabbing}
 .stage.gl-on .house{display:none}
 .stage.gl-on .gl3{animation:glIn .6s var(--ease) both}
@@ -1093,11 +1096,28 @@ function ripple(e) {
 }
 
 /* ---------- caption ---------- */
-let sayT, swapT;
+let sayT, swapT, swapGen = 0, captionShown = false;
 function setCaption(msg) {
+  if (!captionShown) {
+    caption.textContent = msg;
+    caption.classList.remove('swap');
+    captionShown = true;
+    return;
+  }
+  if (caption.textContent === msg && !caption.classList.contains('swap')) return;
   caption.classList.add('swap');
   clearTimeout(swapT);
-  swapT = setTimeout(() => { caption.textContent = msg; caption.classList.remove('swap'); }, 150);
+  const token = ++swapGen;
+  swapT = setTimeout(() => {
+    if (token !== swapGen) return;
+    caption.textContent = msg;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (token !== swapGen) return;
+        caption.classList.remove('swap');
+      });
+    });
+  }, 200);
 }
 function say(msg) {
   setCaption(msg);
@@ -1586,7 +1606,7 @@ function applyLang() {
   const langs = R().langs;
   langSw.hidden = !langs;
   langSw.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === state.lang));
-  caption.textContent = tr('Tap any part of your home to add it');
+  setCaption(tr('Tap any part of your home to add it'));
   renderSizes(); renderTimes(); renderCountries(); renderList(); renderDays();
   setLoc(state.loc ? 'has' : 'idle');
   for (const el of [barAmt, stageAmt, sumAmt]) setMoney(el, el._cur || 0);
@@ -1611,6 +1631,8 @@ function setTheme(theme) {
   if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
   try { localStorage.setItem('gleam.theme', dark ? 'dark' : 'light'); } catch (_) { /* ignore */ }
   syncThemeButton();
+  if (H3 && H3.syncTheme) H3.syncTheme();
+  requestAnimationFrame(() => { if (H3 && H3.syncTheme) H3.syncTheme(); });
 }
 themeBtn.addEventListener('click', () => setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
 syncThemeButton();
