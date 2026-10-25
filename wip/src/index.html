@@ -20,6 +20,7 @@
   if (supported) supported.setAttribute('content', dark ? 'dark' : 'light');
   var color = document.getElementById('themeColorMeta');
   if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
+  if (/\/sa\/?$/.test(location.pathname)) root.classList.add('has-ar');
   try {
     var langAr = localStorage.getItem('gleam.lang') === 'ar' || /(?:^|[?&])lang=ar(?:&|$)/.test(location.search);
     if (langAr && /\/sa\/?$/.test(location.pathname)) root.classList.add('lang-out');
@@ -125,7 +126,10 @@ html[data-theme="dark"]{
   --stage:#313940;
 }
 .top,.hero,.stage-foot,.block,.foot{transition:opacity .18s ease}
-html.lang-out .top,html.lang-out .hero,html.lang-out .stage-foot,html.lang-out .block,html.lang-out .foot,html.lang-out .bar{opacity:0}
+html.lang-out .top:not(.lang-ghost),html.lang-out .hero:not(.lang-ghost),html.lang-out .stage-foot:not(.lang-ghost),html.lang-out .block:not(.lang-ghost),html.lang-out .foot:not(.lang-ghost),html.lang-out .bar:not(.lang-ghost){opacity:0}
+html.lang-swap:not(.lang-in) .top:not(.lang-ghost),html.lang-swap:not(.lang-in) .hero:not(.lang-ghost),html.lang-swap:not(.lang-in) .stage-foot:not(.lang-ghost),html.lang-swap:not(.lang-in) .right:not(.lang-ghost),html.lang-swap:not(.lang-in) .left > .block:not(.lang-ghost),html.lang-swap:not(.lang-in) .foot:not(.lang-ghost),html.lang-swap:not(.lang-in) .bar:not(.lang-ghost){opacity:0;transition:none}
+html.lang-in .top:not(.lang-ghost),html.lang-in .hero:not(.lang-ghost),html.lang-in .stage-foot:not(.lang-ghost),html.lang-in .right:not(.lang-ghost),html.lang-in .left > .block:not(.lang-ghost),html.lang-in .foot:not(.lang-ghost),html.lang-in .bar:not(.lang-ghost){opacity:1;transition:opacity .24s ease}
+.lang-ghost{pointer-events:none}
 #langSw button[data-lang="ar"]{font-family:"IBM Plex Sans Arabic",var(--sans)}
 html:not(.ar-font) #langSw button[data-lang="ar"]{visibility:hidden}
 
@@ -384,6 +388,18 @@ html[data-theme="dark"] .tiles img{filter:grayscale(1) invert(1) brightness(.78)
   .right > .block:first-child{margin-top:0}
   .days{margin:0;padding:2px 0 4px}
   .bar{display:none}
+  /* Keep the house column on the left. RTL still applies inside the text. */
+  [dir="rtl"] .top,
+  [dir="rtl"] .hero,
+  [dir="rtl"] .layout{direction:ltr}
+  [dir="rtl"] .hero h1,
+  [dir="rtl"] .hero p,
+  [dir="rtl"] .stage-foot,
+  [dir="rtl"] .layout .right,
+  [dir="rtl"] .left > .block,
+  [dir="rtl"] .foot{direction:rtl}
+  /* Reserve the taller Arabic headline so the stage does not drop on switch. */
+  html.has-ar .hero h1{min-height:2.45em}
 }
 
 @media (prefers-reduced-motion: reduce){
@@ -1115,12 +1131,14 @@ function ripple(e) {
 }
 
 /* ---------- caption ---------- */
-let sayT, swapT, swapGen = 0, captionShown = false;
+let sayT, swapT, swapGen = 0, captionShown = false, langFading = false;
 function setCaption(msg) {
-  if (!captionShown) {
+  if (!captionShown || langFading) {
     caption.textContent = msg;
     caption.classList.remove('swap');
     captionShown = true;
+    clearTimeout(swapT);
+    swapGen++;
     return;
   }
   if (caption.textContent === msg && !caption.classList.contains('swap')) return;
@@ -1663,6 +1681,83 @@ function settleLang() {
   if (!document.documentElement.classList.contains('lang-out')) return;
   requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('lang-out')));
 }
+let langGhosts = [];
+const LANG_FREEZE = ['direction', 'font-family', 'font-weight', 'font-size', 'letter-spacing', 'line-height', 'text-align', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left'];
+function freezePaint(src, dst) {
+  const walk = (a, b) => {
+    const cs = getComputedStyle(a);
+    for (const p of LANG_FREEZE) b.style.setProperty(p, cs.getPropertyValue(p));
+    const ac = a.children, bc = b.children;
+    for (let i = 0; i < ac.length && i < bc.length; i++) walk(ac[i], bc[i]);
+  };
+  walk(src, dst);
+  const fields = src.querySelectorAll('input, textarea, select');
+  const copies = dst.querySelectorAll('input, textarea, select');
+  fields.forEach((el, i) => {
+    const o = copies[i];
+    if (!o) return;
+    if (el.tagName === 'SELECT') o.selectedIndex = el.selectedIndex;
+    else o.value = el.value;
+  });
+}
+function clearLangGhosts() {
+  for (const g of langGhosts) g.remove();
+  langGhosts = [];
+  document.documentElement.classList.remove('lang-swap', 'lang-in');
+}
+function snapshotLang() {
+  const ghosts = [];
+  const roots = [document.querySelector('.top'), document.querySelector('.hero'), document.querySelector('.stage-foot'), document.querySelector('.left > .block'), document.querySelector('.right'), document.querySelector('.foot'), document.querySelector('.bar')];
+  for (const el of roots) {
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || r.width < 2 || r.height < 2) continue;
+    const g = el.cloneNode(true);
+    g.classList.add('lang-ghost');
+    g.setAttribute('aria-hidden', 'true');
+    g.setAttribute('inert', '');
+    g.removeAttribute('id');
+    g.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    g.querySelectorAll('[aria-live]').forEach(n => n.removeAttribute('aria-live'));
+    freezePaint(el, g);
+    g.style.position = 'fixed';
+    g.style.left = r.left + 'px';
+    g.style.top = r.top + 'px';
+    g.style.width = r.width + 'px';
+    g.style.height = r.height + 'px';
+    g.style.margin = '0';
+    g.style.maxWidth = 'none';
+    g.style.zIndex = '25';
+    g.style.pointerEvents = 'none';
+    g.style.opacity = '1';
+    g.style.transition = 'opacity .24s ease';
+    g.style.overflow = 'hidden';
+    g.style.animation = 'none';
+    document.body.appendChild(g);
+    ghosts.push(g);
+  }
+  return ghosts;
+}
+function crossfadeLang(token) {
+  clearLangGhosts();
+  const root = document.documentElement;
+  const ghosts = snapshotLang();
+  langGhosts = ghosts;
+  root.classList.remove('lang-out');
+  root.classList.add('lang-swap');
+  langFading = true;
+  try { paintLang(); } finally { langFading = false; }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (token !== langGen) return;
+    root.classList.add('lang-in');
+    for (const g of ghosts) g.style.opacity = '0';
+    setTimeout(() => {
+      if (token !== langGen) return;
+      clearLangGhosts();
+    }, 280);
+  }));
+}
 function paintLang() {
   const A = isAr(), html = document.documentElement;
   html.lang = A ? 'ar' : 'en'; html.dir = A ? 'rtl' : 'ltr';
@@ -1751,13 +1846,17 @@ langSw.addEventListener('click', e => {
   state.lang = next; state.langPicked = true;
   try { localStorage.setItem('gleam.lang', state.lang); } catch (_) { /* ignore */ }
   const root = document.documentElement;
-  root.classList.add('lang-out');
   const ready = next === 'ar' ? ensureArabicFont() : Promise.resolve();
-  Promise.all([ready, new Promise(r => setTimeout(r, 180))]).then(() => {
-    if (token !== langGen) return;
-    paintLang();
-    requestAnimationFrame(() => requestAnimationFrame(() => { if (token === langGen) root.classList.remove('lang-out'); }));
-  });
+  if (!desktop.matches) {
+    root.classList.add('lang-out');
+    Promise.all([ready, new Promise(r => setTimeout(r, 180))]).then(() => {
+      if (token !== langGen) return;
+      paintLang();
+      requestAnimationFrame(() => requestAnimationFrame(() => { if (token === langGen) root.classList.remove('lang-out'); }));
+    });
+    return;
+  }
+  ready.then(() => { if (token === langGen) crossfadeLang(token); });
 });
 
 /* ---------- start ---------- */

@@ -659,8 +659,14 @@ export function mount(host, opts = {}) {
     place(hi);
   }
 
-  function resize() {
+  let viewW = -1, viewH = -1;
+  function resize(fromObserver) {
     const w = host.clientWidth || 360, h = Math.round(Math.min(w / 1.48, (window.innerHeight || 700) * (w >= 960 ? 0.62 : 0.38)));
+    // A language switch can notify the observer without changing the drawing size.
+    // Skip that so the camera is not framed again. A real rebuild still reframes.
+    if (fromObserver && (!host.clientWidth || (w === viewW && h === viewH))) return;
+    viewW = w;
+    viewH = h;
     canvas.style.height = h + 'px';
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap));
     renderer.setSize(w, h, false);
@@ -675,7 +681,7 @@ export function mount(host, opts = {}) {
     frameHouse();
     draw();
   }
-  const ro = new ResizeObserver(resize); ro.observe(host);
+  const ro = new ResizeObserver(() => resize(true)); ro.observe(host);
 
   let visible = true, raf = 0, last = performance.now(), frames = [];
   const io = new IntersectionObserver(entries => {
