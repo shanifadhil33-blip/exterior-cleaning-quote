@@ -44,7 +44,9 @@ export function mount(host, opts = {}) {
   const camera = new THREE.PerspectiveCamera(30, 1.5, 0.2, 80);
   const PI = Math.PI;
   const hemi = new THREE.HemisphereLight(0xffffff, 0x262626, 0.78 * PI);
-  const sun = new THREE.DirectionalLight(0xffffff, 0.62 * PI);
+  // A touch under the estimator key, with a stronger fill, so a sun-facing
+  // wall stays a wall colour instead of clipping to white.
+  const sun = new THREE.DirectionalLight(0xffffff, 0.5 * PI);
   sun.position.set(7.2, 18, 11);
   sun.castShadow = true;
   sun.shadow.camera.near = 1;
@@ -56,7 +58,7 @@ export function mount(host, opts = {}) {
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.bias = -0.0006;
   sun.shadow.normalBias = 0.035;
-  const fill = new THREE.DirectionalLight(0xffffff, 0.22 * PI);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.3 * PI);
   fill.position.set(-12, 8, -7);
   scene.add(hemi, sun, fill);
   sun.target.position.set(0, 1.4, 0);
@@ -65,11 +67,13 @@ export function mount(host, opts = {}) {
   const bgCur = new THREE.Color(0xeceeee);
   const BG_LIGHT = new THREE.Color(0xeceeee);
   const BG_DARK = new THREE.Color(0x121618);
+  const LAWN_LIGHT = new THREE.Color(0xc5d0c8);
+  const LAWN_DARK = new THREE.Color(0x24312c);
+  const lawnCur = new THREE.Color(0xc5d0c8);
   scene.background = bgCur;
   scene.fog = new THREE.Fog(0xeceeee, 8000, 12000);
   let themeUntil = 0;
   let shadowMat = null;
-  let contactMat = null;
   // 1 = light, 0 = dark, taken from the page colour that is already on screen
   function themeMix() {
     const span = BG_LIGHT.r - BG_DARK.r;
@@ -81,11 +85,11 @@ export function mount(host, opts = {}) {
     hemi.groundColor.set(0x262626);
     hemi.intensity = 0.78 * PI;
     sun.color.set(0xffffff);
-    sun.intensity = 0.62 * PI;
+    sun.intensity = 0.5 * PI;
     fill.color.set(0xffffff);
-    fill.intensity = 0.22 * PI;
+    fill.intensity = 0.3 * PI;
     if (shadowMat) shadowMat.opacity = 0.4 + (0.25 - 0.4) * t;
-    if (contactMat) contactMat.color.setRGB(1 - t, 1 - t, 1 - t);
+    lawnCur.copy(LAWN_DARK).lerp(LAWN_LIGHT, t);
   }
   function sampleStage() {
     const raw = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
@@ -153,42 +157,59 @@ export function mount(host, opts = {}) {
     return m;
   }
   // grime overlay: fades, shrinks, or falls as the part gets clean
-  // Soften a slab into the page colour at its far local +z end. Colour mix, not
-  // alpha, so the end does not sort or flicker.
+  // Feather only the far tip of a slab into the lawn, not into empty page.
   function paveFade(mat, half) {
-    mat.customProgramCacheKey = () => 'gleam-pave-fade';
+    mat.customProgramCacheKey = () => 'gleam-pave-lawn';
     mat.onBeforeCompile = shader => {
-      shader.uniforms.uBg = { value: bgCur };
+      shader.uniforms.uLawn = { value: lawnCur };
       shader.uniforms.uHalf = { value: Math.max(0.2, half) };
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vFadeP;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFadeP = position;');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vFadeP;\nuniform vec3 uBg;\nuniform float uHalf;')
+        .replace('#include <common>', '#include <common>\nvarying vec3 vFadeP;\nuniform vec3 uLawn;\nuniform float uHalf;')
         .replace('#include <fog_fragment>', `#include <fog_fragment>
-          float fadeT = smoothstep(0.55, 1.02, vFadeP.z / max(uHalf, 0.001));
-          vec3 bgLin = max(uBg, vec3(0.0));
-          vec3 bgSRGB = mix(bgLin * 12.92, 1.055 * pow(bgLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), bgLin));
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, bgSRGB, fadeT);`);
+          float fadeT = smoothstep(0.78, 1.02, vFadeP.z / max(uHalf, 0.001));
+          vec3 lawnLin = max(uLawn, vec3(0.0));
+          vec3 lawnSRGB = mix(lawnLin * 12.92, 1.055 * pow(lawnLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), lawnLin));
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, lawnSRGB, fadeT);`);
     };
     return mat;
   }
-  function contactTexture() {
-    const c = document.createElement('canvas');
-    c.width = c.height = 256;
-    const g = c.getContext('2d');
-    const gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
-    gr.addColorStop(0, 'rgba(255,255,255,0.085)');
-    gr.addColorStop(0.55, 'rgba(255,255,255,0.028)');
-    gr.addColorStop(0.78, 'rgba(255,255,255,0.008)');
-    gr.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = gr;
-    g.fillRect(0, 0, 256, 256);
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
+  // Darken the foot of a wall and the band under the eaves so a big face is not one flat tone.
+  function wallAo(mat) {
+    mat.customProgramCacheKey = () => 'gleam-wall-ao';
+    mat.onBeforeCompile = shader => {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying float vWallY;')
+        .replace('#include <project_vertex>', '#include <project_vertex>\nvWallY = (modelMatrix * vec4(transformed, 1.0)).y;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vWallY;')
+        .replace('#include <opaque_fragment>', `#include <opaque_fragment>
+          float baseAo = smoothstep(0.02, 0.7, vWallY);
+          float eave = smoothstep(2.2, 1.25, vWallY);
+          gl_FragColor.rgb *= mix(0.62, 1.0, baseAo) * mix(0.84, 1.0, clamp(eave, 0.0, 1.0));`);
+    };
+    return mat;
   }
-  const contactTex = contactTexture();
+  const lawnMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+  lawnMat.customProgramCacheKey = () => 'gleam-lawn';
+  lawnMat.onBeforeCompile = shader => {
+    shader.uniforms.uBg = { value: bgCur };
+    shader.uniforms.uLawn = { value: lawnCur };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vLawn;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLawn = position.xy;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vLawn;\nuniform vec3 uBg;\nuniform vec3 uLawn;')
+      .replace('#include <fog_fragment>', `#include <fog_fragment>
+        float fade = smoothstep(0.68, 1.0, length(vLawn) * 2.0);
+        vec3 lawnLin = max(uLawn, vec3(0.0));
+        vec3 bgLin = max(uBg, vec3(0.0));
+        vec3 lawnSRGB = mix(lawnLin * 12.92, 1.055 * pow(lawnLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), lawnLin));
+        vec3 bgSRGB = mix(bgLin * 12.92, 1.055 * pow(bgLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), bgLin));
+        gl_FragColor.rgb = mix(lawnSRGB, bgSRGB, fade);`);
+  };
   function grime(p, mesh, mode) {
     mesh.renderOrder = 4;
     mesh.userData.mode = mode;
@@ -236,24 +257,29 @@ export function mount(host, opts = {}) {
     }
     radius = Math.max(4.2, (W + gw) * 0.55 + Dp * 0.45);
 
-    // Contact shade stays inside the footprint. Its centre is the brightest
-    // part of the gradient, so it has to sit under the building, not beside it.
+    // Small lawn under the house and the paving. The outer band fades to the
+    // page colour, so the edge never reads as a ring or a hard cut.
     const cx = x0 + gw / 2;
-    contactMat = new THREE.MeshBasicMaterial({ map: contactTex, transparent: true, depthWrite: false, toneMapped: false });
-    const contact = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), contactMat);
-    contact.rotation.x = -Math.PI / 2;
-    contact.position.set(cx, -0.02, 0);
-    contact.scale.set((W + gw) * 0.86, Dp * 0.86, 1);
-    contact.renderOrder = -2;
-    contact.castShadow = false;
-    contact.receiveShadow = false;
-    contact.userData.ground = true;
-    root.add(contact);
+    const zSolidMin = -front - 0.45;
+    const zSolidMax = front + 1.85;
+    const cz = (zSolidMin + zSolidMax) / 2;
+    const fadeAt = 0.68;
+    const lawnW = (((W + gw) / 2 + 0.7) / fadeAt) * 2;
+    const lawnD = ((Math.max(zSolidMax - cz, cz - zSolidMin)) / fadeAt) * 2;
+    const lawn = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), lawnMat);
+    lawn.rotation.x = -Math.PI / 2;
+    lawn.position.set(cx, -0.03, cz);
+    lawn.scale.set(lawnW, lawnD, 1);
+    lawn.renderOrder = -2;
+    lawn.castShadow = false;
+    lawn.receiveShadow = false;
+    lawn.userData.ground = true;
+    root.add(lawn);
     shadowMat = new THREE.ShadowMaterial({ opacity: themeDark() ? 0.4 : 0.25, depthWrite: false });
     const catcher = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shadowMat);
     catcher.rotation.x = -Math.PI / 2;
-    catcher.position.set(cx, -0.012, 0);
-    catcher.scale.set((W + gw) * 1.8, Dp * 2.4, 1);
+    catcher.position.set(cx, -0.012, cz);
+    catcher.scale.set(lawnW * 0.92, lawnD * 0.92, 1);
     catcher.renderOrder = -1;
     catcher.castShadow = false;
     catcher.receiveShadow = true;
@@ -270,23 +296,44 @@ export function mount(host, opts = {}) {
     };
 
     // neighbours overlap the main wall so the shared face is buried, and their roof sits lower so the slopes are not coplanar
-    const nbMat = M(C.nb), nbRoof = M('#c9d2d6');
+    // Attached wings use the same wall family as the house, a step darker, with their own windows.
+    const nbMat = wallAo(M('#c4b7a2', { roughness: 0.94, flatShading: false }));
+    const nbRoof = M(C.roofDirty, { roughness: 0.9, flatShading: true });
     const gx = gw ? x0 + W / 2 + gw / 2 - 0.06 : 0;
+    const decorWin = (wx, wy, wz) => {
+      root.add(box(0.48, 0.42, 0.06, M(C.frame, { roughness: 0.9, flatShading: false }), wx, wy, wz));
+      root.add(box(0.36, 0.3, 0.03, M(C.glassDirty, { roughness: 0.2, metalness: 0.04, flatShading: false }), wx, wy, wz + 0.03));
+    };
     const neighbour = side => {
       const nx = side * (W - 0.08) + x0;
       const wall = box(W, H, Dp - 0.04, nbMat, nx, H / 2, -0.03);
       root.add(wall);
       if (flat) root.add(box(W + 0.02, 0.22, Dp + 0.02, nbMat, nx, H + 0.06, -0.02));
       else { const rf = gable(W, Dp + 0.3, 0.85, nbRoof); rf.position.set(nx, H - 0.1, 0); root.add(rf); }
+      const zf = -0.03 + (Dp - 0.04) / 2 + 0.03;
+      for (let f = 0; f < s.floors; f++) {
+        decorWin(nx - W * 0.22, f * FH + 0.55, zf);
+        decorWin(nx + W * 0.22, f * FH + 0.55, zf);
+      }
     };
     if (s.neigh === 'left' || s.neigh === 'both') neighbour(-1);
     if (s.neigh === 'both') neighbour(1);
 
     // walls
     const pw = part('walls');
-    const wallMat = dirtyMat(pw, C.wallDirty, C.wall, { roughness: 0.94 });
+    const wallMat = wallAo(dirtyMat(pw, C.wallDirty, C.wall, { roughness: 0.94, flatShading: false }));
+    const plinthMat = dirtyMat(pw, '#9c8f78', '#c8cece', { roughness: 0.96, flatShading: false });
+    const trimMat = dirtyMat(pw, '#cfc6b8', C.frame, { roughness: 0.9, flatShading: false });
     pw.g.add(box(W, H, Dp, wallMat, x0, H / 2, 0));
     if (gw) pw.g.add(box(gw, 1.0, gDepth, wallMat, gx, 0.5, gZ));
+    pw.g.add(box(W + 0.08, 0.16, Dp + 0.08, plinthMat, x0, 0.08, 0));
+    if (gw) pw.g.add(box(gw + 0.06, 0.14, gDepth + 0.06, plinthMat, gx, 0.07, gZ));
+    if (s.floors > 1) pw.g.add(box(W + 0.05, 0.06, Dp + 0.05, trimMat, x0, FH, 0));
+    const pilaster = (x, z) => pw.g.add(box(0.09, H + 0.02, 0.09, trimMat, x, H / 2, z));
+    pilaster(x0 - W / 2, front);
+    pilaster(x0 + W / 2, front);
+    pilaster(x0 - W / 2, -front);
+    pilaster(x0 + W / 2, -front);
     if (s.apt) for (let f = 1; f < s.floors; f++) pw.g.add(box(W + 0.12, 0.06, Dp + 0.12, wallMat, x0, f * FH, 0));
     const streakMat = () => decalMat(C.streak, 0.28);
     for (let i = 0; i < 7 + s.bays * 2; i++) {
@@ -301,7 +348,21 @@ export function mount(host, opts = {}) {
     const doorX = x0 + (s.bays > 2 ? 0 : -W / 4 + 0.1);
     root.add(box(0.5, 0.86, 0.08, M(C.door), doorX, 0.41, front + 0.04));
     root.add(box(0.46, 0.8, 0.08, M(C.door), doorX, 0.4, -front - 0.04));
-    if (gw) root.add(box(gw - 0.25, 0.8, 0.08, M(C.garage), gx, 0.38, gFront + 0.04));
+    if (gw) {
+      const doorW = Math.max(0.7, gw - 0.36);
+      const doorH = 0.7;
+      const doorY = 0.42;
+      const gdMat = M(C.door, { roughness: 0.88, flatShading: false });
+      const railMat = M(C.frame, { roughness: 0.82, flatShading: false });
+      pw.g.add(box(doorW + 0.14, doorH + 0.12, 0.04, trimMat, gx, doorY, gFront + 0.02));
+      pw.g.add(box(doorW, doorH, 0.045, gdMat, gx, doorY, gFront + 0.05));
+      pw.g.add(box(0.05, doorH, 0.03, railMat, gx - doorW / 2 + 0.06, doorY, gFront + 0.08));
+      pw.g.add(box(0.05, doorH, 0.03, railMat, gx + doorW / 2 - 0.06, doorY, gFront + 0.08));
+      pw.g.add(box(0.045, doorH - 0.08, 0.03, railMat, gx, doorY, gFront + 0.08));
+      pw.g.add(box(doorW - 0.16, 0.045, 0.03, railMat, gx, doorY, gFront + 0.08));
+      pw.g.add(box(doorW - 0.16, 0.04, 0.025, railMat, gx, doorY + doorH * 0.22, gFront + 0.075));
+      pw.g.add(box(doorW - 0.16, 0.04, 0.025, railMat, gx, doorY - doorH * 0.22, gFront + 0.075));
+    }
 
     // windows
     const pwin = part('windows');
@@ -311,6 +372,7 @@ export function mount(host, opts = {}) {
     const winFace = (wx, wy, wz, out) => {
       pwin.g.add(box(0.62, 0.58, 0.08, frameMat, wx, wy, wz));
       pwin.g.add(box(0.52, 0.48, 0.04, glassMat, wx, wy, wz + out * 0.035));
+      pwin.g.add(box(0.72, 0.05, 0.1, frameMat, wx, wy - 0.32, wz + out * 0.03));
     };
     for (let f = 0; f < s.floors; f++) {
       for (let b = 0; b < s.bays; b++) {
@@ -334,10 +396,13 @@ export function mount(host, opts = {}) {
     if (s.neigh !== 'left' && s.neigh !== 'both') { sideWin(-1, -0.25); sideWin(-1, 0.45); }
     if (!gw && s.neigh !== 'both') { sideWin(1, -0.25); sideWin(1, 0.45); }
     if (gw) {
-      pwin.g.add(box(0.46, 0.32, 0.06, frameMat, gx, 0.58, gBack - 0.04));
-      pwin.g.add(box(0.34, 0.22, 0.03, glassMat, gx, 0.58, gBack - 0.06));
-      pwin.g.add(box(0.06, 0.36, 0.4, frameMat, gx + gw / 2 + 0.04, 0.58, gZ));
-      pwin.g.add(box(0.03, 0.26, 0.28, glassMat, gx + gw / 2 + 0.06, 0.58, gZ));
+      pwin.g.add(box(0.46, 0.32, 0.06, frameMat, gx, 0.62, gBack - 0.04));
+      pwin.g.add(box(0.34, 0.22, 0.03, glassMat, gx, 0.62, gBack - 0.06));
+      pwin.g.add(box(Math.min(0.7, gw - 0.4), 0.22, 0.06, frameMat, gx, 0.86, gFront + 0.04));
+      pwin.g.add(box(Math.min(0.56, gw - 0.52), 0.14, 0.03, glassMat, gx, 0.86, gFront + 0.07));
+      pwin.g.add(box(0.06, 0.36, 0.42, frameMat, gx + gw / 2 + 0.04, 0.58, gZ));
+      pwin.g.add(box(0.03, 0.26, 0.3, glassMat, gx + gw / 2 + 0.06, 0.58, gZ));
+      pwin.g.add(box(0.5, 0.05, 0.08, frameMat, gx + gw / 2 + 0.05, 0.38, gZ));
     }
 
     // roof, dropped into the wall so the soffit is not coplanar with the wall top
@@ -358,11 +423,16 @@ export function mount(host, opts = {}) {
         m.rotation.x = -Math.PI / 2; m.position.set(x0 + (r() - 0.5) * (W - 0.4), H + 0.095, (r() - 0.5) * (Dp - 0.4));
         grime(pr, m, 'fade');
       }
-      if (gw) pr.g.add(box(gw + 0.06, 0.08, gDepth + 0.06, roofMat, gx, 0.98, gZ));
+      if (gw) {
+        pr.g.add(box(gw + 0.08, 0.08, gDepth + 0.08, roofMat, gx, 0.98, gZ));
+        const lip = dirtyMat(pr, C.wallDirty, C.wall, { roughness: 0.94, flatShading: false });
+        pr.g.add(box(gw + 0.1, 0.16, 0.08, lip, gx, 1.08, gFront + 0.02));
+        pr.g.add(box(gw + 0.1, 0.16, 0.08, lip, gx, 1.08, gBack - 0.02));
+      }
     } else {
       const roof = s.neigh ? gable(RW, RD, RH, roofMat) : hip(RW, RD, RH, roofMat);
       roof.position.set(x0, H - roofSink, 0); pr.g.add(roof);
-      if (gw) { const gr = gable(gw + 0.2, gDepth + 0.16, 0.45, roofMat); gr.position.set(gx, 0.94, gZ); pr.g.add(gr); }
+      if (gw) { const gr = gable(gw + 0.36, gDepth + 0.4, 0.48, roofMat); gr.position.set(gx, 0.96, gZ); pr.g.add(gr); }
       slope = Math.atan2(RH, RD / 2);
       const mossMat = new THREE.MeshStandardMaterial({ color: col(C.moss), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
       const ny = Math.cos(slope), nz = Math.sin(slope);
@@ -454,7 +524,7 @@ export function mount(host, opts = {}) {
 
     // driveway, patio and path each have their own height. Dirt sits just above its own slab.
     const pd = part('driveway');
-    const dw = gw ? gw + 0.3 : 1.3, dx = gw ? gx : x0 + W / 2 - dw / 2 - 0.05, dl = 1.7;
+    const dw = gw ? gw + 0.15 : 1.15, dx = gw ? gx : x0 + W / 2 - dw / 2 - 0.05, dl = 1.45;
     const paveMat = paveFade(paveOf(dirtyMat(pd, C.paveDirty, C.pave, { roughness: 0.93 })), dl / 2);
     const driveTop = slab(pd.g, dw, 0.028, dl, paveMat, dx, front + dl / 2 + 0.05, 0.02, 2);
     for (let i = 0; i < 6; i++) {
@@ -497,8 +567,8 @@ export function mount(host, opts = {}) {
     sun.shadow.camera.top = sds;
     sun.shadow.camera.bottom = -sds;
     sun.shadow.camera.updateProjectionMatrix();
-    sun.position.set(span * 0.45 + 6, H + 14, span * 0.5 + 8);
-    fill.position.set(-span - 5, H * 0.7 + 5, -span * 0.35 - 4);
+    sun.position.set(span * 0.9 + 4, H + 7.5, span * 0.35 + 5);
+    fill.position.set(-span - 4, H * 0.85 + 4, -span * 0.2 - 3);
     sun.target.position.set(0, H * 0.35, 0);
     sun.target.updateMatrixWorld();
     Object.values(parts).forEach(applyClean);
