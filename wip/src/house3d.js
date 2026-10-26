@@ -73,7 +73,7 @@ export function mount(host, opts = {}) {
   scene.background = bgCur;
   scene.fog = new THREE.Fog(0xeceeee, 8000, 12000);
   let themeUntil = 0;
-  let shadowMat = null;
+  const contactU = { value: 0.28 };
   // 1 = light, 0 = dark, taken from the page colour that is already on screen
   function themeMix() {
     const span = BG_LIGHT.r - BG_DARK.r;
@@ -88,7 +88,7 @@ export function mount(host, opts = {}) {
     sun.intensity = 0.5 * PI;
     fill.color.set(0xffffff);
     fill.intensity = 0.3 * PI;
-    if (shadowMat) shadowMat.opacity = 0.4 + (0.25 - 0.4) * t;
+    contactU.value = 0.40 + (0.22 - 0.40) * t;
     lawnCur.copy(LAWN_DARK).lerp(LAWN_LIGHT, t);
   }
   function sampleStage() {
@@ -197,17 +197,21 @@ export function mount(host, opts = {}) {
   lawnMat.onBeforeCompile = shader => {
     shader.uniforms.uBg = { value: bgCur };
     shader.uniforms.uLawn = { value: lawnCur };
+    shader.uniforms.uContact = contactU;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec2 vLawn;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLawn = position.xy;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vLawn;\nuniform vec3 uBg;\nuniform vec3 uLawn;')
+      .replace('#include <common>', '#include <common>\nvarying vec2 vLawn;\nuniform vec3 uBg;\nuniform vec3 uLawn;\nuniform float uContact;')
       .replace('#include <fog_fragment>', `#include <fog_fragment>
-        float fade = smoothstep(0.68, 1.0, length(vLawn) * 2.0);
+        float rad = length(vLawn) * 2.0;
+        float fade = smoothstep(0.68, 1.0, rad);
+        float contact = 1.0 - smoothstep(0.0, 0.42, rad);
         vec3 lawnLin = max(uLawn, vec3(0.0));
         vec3 bgLin = max(uBg, vec3(0.0));
         vec3 lawnSRGB = mix(lawnLin * 12.92, 1.055 * pow(lawnLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), lawnLin));
         vec3 bgSRGB = mix(bgLin * 12.92, 1.055 * pow(bgLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), bgLin));
+        lawnSRGB *= 1.0 - uContact * contact;
         gl_FragColor.rgb = mix(lawnSRGB, bgSRGB, fade);`);
   };
   function grime(p, mesh, mode) {
@@ -269,27 +273,18 @@ export function mount(host, opts = {}) {
     const lawn = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), lawnMat);
     lawn.rotation.x = -Math.PI / 2;
     lawn.position.set(cx, -0.03, cz);
-    lawn.scale.set(lawnW, lawnD, 1);
+    lawn.scale.set(lawnW * 0.88, lawnD * 0.88, 1);
     lawn.renderOrder = -2;
     lawn.castShadow = false;
     lawn.receiveShadow = false;
     lawn.userData.ground = true;
     root.add(lawn);
-    shadowMat = new THREE.ShadowMaterial({ opacity: themeDark() ? 0.4 : 0.25, depthWrite: false });
-    const catcher = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shadowMat);
-    catcher.rotation.x = -Math.PI / 2;
-    catcher.position.set(cx, -0.012, cz);
-    catcher.scale.set(lawnW * 0.92, lawnD * 0.92, 1);
-    catcher.renderOrder = -1;
-    catcher.castShadow = false;
-    catcher.receiveShadow = true;
-    catcher.userData.ground = true;
-    root.add(catcher);
     applySceneTheme();
     const paveOf = mat => { mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -2; return mat; };
     const slab = (parent, w, h, d, mat, x, z, yBottom, order) => {
       const m = box(w, h, d, mat, x, yBottom + h / 2, z);
       m.castShadow = false;
+      m.receiveShadow = false;
       m.renderOrder = order;
       parent.add(m);
       return yBottom + h;
@@ -299,10 +294,19 @@ export function mount(host, opts = {}) {
     // Attached wings use the same wall family as the house, a step darker, with their own windows.
     const nbMat = wallAo(M('#c4b7a2', { roughness: 0.94, flatShading: false }));
     const nbRoof = M(C.roofDirty, { roughness: 0.9, flatShading: true });
+    const revealMat = M(C.door, { roughness: 0.88, flatShading: false });
     const gx = gw ? x0 + W / 2 + gw / 2 - 0.06 : 0;
-    const decorWin = (wx, wy, wz) => {
-      root.add(box(0.48, 0.42, 0.06, M(C.frame, { roughness: 0.9, flatShading: false }), wx, wy, wz));
-      root.add(box(0.36, 0.3, 0.03, M(C.glassDirty, { roughness: 0.2, metalness: 0.04, flatShading: false }), wx, wy, wz + 0.03));
+    const decorWin = (wx, wy, wz, out) => {
+      root.add(box(0.62, 0.56, 0.05, revealMat, wx, wy, wz));
+      root.add(box(0.52, 0.46, 0.045, M(C.frame, { roughness: 0.9, flatShading: false }), wx, wy, wz + out * 0.02));
+      root.add(box(0.4, 0.34, 0.03, M(C.glassDirty, { roughness: 0.2, metalness: 0.04, flatShading: false }), wx, wy, wz + out * 0.04));
+      root.add(box(0.03, 0.34, 0.02, M(C.frame, { roughness: 0.86 }), wx, wy, wz + out * 0.05));
+      root.add(box(0.4, 0.03, 0.02, M(C.frame, { roughness: 0.86 }), wx, wy, wz + out * 0.05));
+    };
+    const decorSide = (sx, sy, sz, out) => {
+      root.add(box(0.05, 0.48, 0.5, revealMat, sx, sy, sz));
+      root.add(box(0.04, 0.38, 0.38, M(C.frame, { roughness: 0.9 }), sx + out * 0.02, sy, sz));
+      root.add(box(0.025, 0.28, 0.28, M(C.glassDirty, { roughness: 0.2, metalness: 0.04 }), sx + out * 0.035, sy, sz));
     };
     const neighbour = side => {
       const nx = side * (W - 0.08) + x0;
@@ -310,10 +314,28 @@ export function mount(host, opts = {}) {
       root.add(wall);
       if (flat) root.add(box(W + 0.02, 0.22, Dp + 0.02, nbMat, nx, H + 0.06, -0.02));
       else { const rf = gable(W, Dp + 0.3, 0.85, nbRoof); rf.position.set(nx, H - 0.1, 0); root.add(rf); }
-      const zf = -0.03 + (Dp - 0.04) / 2 + 0.03;
+      const zf = -0.03 + (Dp - 0.04) / 2 + 0.04;
+      const zb = -0.03 - (Dp - 0.04) / 2 - 0.04;
+      const doorB = s.bays > 2 ? Math.floor(s.bays / 2) : 0;
       for (let f = 0; f < s.floors; f++) {
-        decorWin(nx - W * 0.22, f * FH + 0.55, zf);
-        decorWin(nx + W * 0.22, f * FH + 0.55, zf);
+        for (let b = 0; b < s.bays; b++) {
+          const wx = nx - W / 2 + 0.2 + bay * (b + 0.5), wy = f * FH + 0.55;
+          decorWin(wx, wy, zf, 1);
+          if (f === 0 && b === doorB) {
+            root.add(box(0.58, 0.96, 0.04, M(C.frame, { roughness: 0.9 }), wx, 0.48, zb + 0.02));
+            root.add(box(0.46, 0.82, 0.06, M(C.door, { roughness: 0.88 }), wx, 0.44, zb));
+          } else decorWin(wx, wy, zb, -1);
+        }
+      }
+      const sx = nx + side * (W / 2 + 0.05);
+      for (let f = 0; f < s.floors; f++) {
+        decorSide(sx, f * FH + 0.55, -0.2, side);
+        decorSide(sx, f * FH + 0.55, 0.45, side);
+      }
+      if (!flat) {
+        const gxEnd = nx + side * (W / 2 + 0.16);
+        root.add(box(0.05, 0.28, 0.34, revealMat, gxEnd, H + 0.2, 0));
+        root.add(box(0.03, 0.18, 0.22, M(C.glassDirty, { roughness: 0.2, metalness: 0.04 }), gxEnd + side * 0.03, H + 0.2, 0));
       }
     };
     if (s.neigh === 'left' || s.neigh === 'both') neighbour(-1);
@@ -346,8 +368,11 @@ export function mount(host, opts = {}) {
 
     // doors sit just proud of the wall so the faces are not coplanar
     const doorX = x0 + (s.bays > 2 ? 0 : -W / 4 + 0.1);
-    root.add(box(0.5, 0.86, 0.08, M(C.door), doorX, 0.41, front + 0.04));
-    root.add(box(0.46, 0.8, 0.08, M(C.door), doorX, 0.4, -front - 0.04));
+    root.add(box(0.62, 1.0, 0.04, trimMat, doorX, 0.48, front + 0.02));
+    root.add(box(0.5, 0.86, 0.08, M(C.door), doorX, 0.45, front + 0.05));
+    root.add(box(0.62, 1.0, 0.04, trimMat, doorX, 0.48, -front - 0.02));
+    root.add(box(0.5, 0.86, 0.08, M(C.door), doorX, 0.45, -front - 0.05));
+    root.add(box(0.72, 0.06, 0.22, plinthMat, doorX, 0.04, -front - 0.16));
     if (gw) {
       const doorW = Math.max(0.7, gw - 0.36);
       const doorH = 0.7;
@@ -370,9 +395,12 @@ export function mount(host, opts = {}) {
     const frameMat = M(C.frame, { roughness: 0.92 });
     const doorBay = s.bays > 2 ? Math.floor(s.bays / 2) : 0;
     const winFace = (wx, wy, wz, out) => {
-      pwin.g.add(box(0.62, 0.58, 0.08, frameMat, wx, wy, wz));
-      pwin.g.add(box(0.52, 0.48, 0.04, glassMat, wx, wy, wz + out * 0.035));
-      pwin.g.add(box(0.72, 0.05, 0.1, frameMat, wx, wy - 0.32, wz + out * 0.03));
+      pwin.g.add(box(0.68, 0.64, 0.05, revealMat, wx, wy, wz));
+      pwin.g.add(box(0.58, 0.54, 0.05, frameMat, wx, wy, wz + out * 0.02));
+      pwin.g.add(box(0.46, 0.42, 0.03, glassMat, wx, wy, wz + out * 0.04));
+      pwin.g.add(box(0.035, 0.42, 0.02, frameMat, wx, wy, wz + out * 0.05));
+      pwin.g.add(box(0.46, 0.035, 0.02, frameMat, wx, wy, wz + out * 0.05));
+      pwin.g.add(box(0.76, 0.05, 0.08, frameMat, wx, wy - 0.36, wz + out * 0.02));
     };
     for (let f = 0; f < s.floors; f++) {
       for (let b = 0; b < s.bays; b++) {
@@ -385,24 +413,40 @@ export function mount(host, opts = {}) {
         }
       }
     }
-    const sideWin = (sign, z) => {
+    const sideWin = (sign, z, floorFrom = 0) => {
       const sx = x0 + sign * (W / 2 + 0.045);
-      for (let f = 0; f < s.floors; f++) {
+      for (let f = floorFrom; f < s.floors; f++) {
         const wy = f * FH + 0.55;
-        pwin.g.add(box(0.06, 0.42, 0.46, frameMat, sx, wy, z));
-        pwin.g.add(box(0.03, 0.32, 0.34, glassMat, sx + sign * 0.025, wy, z));
+        pwin.g.add(box(0.05, 0.5, 0.52, revealMat, sx, wy, z));
+        pwin.g.add(box(0.04, 0.4, 0.4, frameMat, sx + sign * 0.02, wy, z));
+        pwin.g.add(box(0.025, 0.3, 0.3, glassMat, sx + sign * 0.035, wy, z));
+        pwin.g.add(box(0.02, 0.3, 0.03, frameMat, sx + sign * 0.045, wy, z));
       }
     };
-    if (s.neigh !== 'left' && s.neigh !== 'both') { sideWin(-1, -0.25); sideWin(-1, 0.45); }
-    if (!gw && s.neigh !== 'both') { sideWin(1, -0.25); sideWin(1, 0.45); }
+    if (s.neigh !== 'left' && s.neigh !== 'both') { sideWin(-1, -0.35); sideWin(-1, 0.35); }
+    if (!gw && s.neigh !== 'both') { sideWin(1, -0.35); sideWin(1, 0.35); }
+    // The garage covers the ground floor on this side. Floors above it stay open.
+    else if (gw && s.floors > 1 && s.neigh !== 'both') { sideWin(1, -0.28, 1); sideWin(1, 0.42, 1); }
+    if (!flat) {
+      const gableLight = sign => {
+        const sx = x0 + sign * ((W + 0.3) / 2 + 0.03);
+        pwin.g.add(box(0.05, 0.32, 0.38, revealMat, sx, H + 0.28, 0));
+        pwin.g.add(box(0.035, 0.22, 0.26, frameMat, sx + sign * 0.02, H + 0.28, 0));
+        pwin.g.add(box(0.02, 0.16, 0.18, glassMat, sx + sign * 0.035, H + 0.28, 0));
+      };
+      // Hip roofs have no gable face. A shared wall buries the end it covers.
+      if (s.neigh && s.neigh !== 'left' && s.neigh !== 'both') gableLight(-1);
+      if (s.neigh && s.neigh !== 'both') gableLight(1);
+    }
     if (gw) {
-      pwin.g.add(box(0.46, 0.32, 0.06, frameMat, gx, 0.62, gBack - 0.04));
-      pwin.g.add(box(0.34, 0.22, 0.03, glassMat, gx, 0.62, gBack - 0.06));
-      pwin.g.add(box(Math.min(0.7, gw - 0.4), 0.22, 0.06, frameMat, gx, 0.86, gFront + 0.04));
-      pwin.g.add(box(Math.min(0.56, gw - 0.52), 0.14, 0.03, glassMat, gx, 0.86, gFront + 0.07));
-      pwin.g.add(box(0.06, 0.36, 0.42, frameMat, gx + gw / 2 + 0.04, 0.58, gZ));
-      pwin.g.add(box(0.03, 0.26, 0.3, glassMat, gx + gw / 2 + 0.06, 0.58, gZ));
-      pwin.g.add(box(0.5, 0.05, 0.08, frameMat, gx + gw / 2 + 0.05, 0.38, gZ));
+      pwin.g.add(box(0.52, 0.38, 0.04, revealMat, gx, 0.62, gBack - 0.02));
+      pwin.g.add(box(0.4, 0.26, 0.04, frameMat, gx, 0.62, gBack - 0.05));
+      pwin.g.add(box(0.3, 0.16, 0.03, glassMat, gx, 0.62, gBack - 0.07));
+      pwin.g.add(box(Math.min(0.7, gw - 0.4), 0.22, 0.04, revealMat, gx, 0.86, gFront + 0.02));
+      pwin.g.add(box(Math.min(0.56, gw - 0.52), 0.14, 0.03, glassMat, gx, 0.86, gFront + 0.06));
+      pwin.g.add(box(0.05, 0.42, 0.48, revealMat, gx + gw / 2 + 0.02, 0.58, gZ));
+      pwin.g.add(box(0.04, 0.32, 0.36, frameMat, gx + gw / 2 + 0.05, 0.58, gZ));
+      pwin.g.add(box(0.025, 0.22, 0.26, glassMat, gx + gw / 2 + 0.07, 0.58, gZ));
     }
 
     // roof, dropped into the wall so the soffit is not coplanar with the wall top
@@ -554,9 +598,21 @@ export function mount(host, opts = {}) {
 
     if (!s.neigh) {
       const t = new THREE.Group();
-      t.add(box(0.1, 0.74, 0.1, M('#b4bcc0'), 0, 0.33, 0));
-      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 0), M(C.tree)); crown.position.y = 1.05; t.add(crown);
-      t.position.set(-(W + gw) / 2 - 0.9, 0, 0.6); root.add(t);
+      const trunk = M('#6b5340', { roughness: 0.95, flatShading: false });
+      const leaf = M('#4e6b38', { roughness: 0.94, flatShading: true });
+      const leaf2 = M('#6d8b4a', { roughness: 0.92, flatShading: true });
+      t.add(box(0.12, 0.36, 0.12, trunk, 0, 0.18, 0));
+      const puff = (mat, rad, x, y, z) => {
+        const m = new THREE.Mesh(new THREE.SphereGeometry(rad, 10, 8), mat);
+        m.position.set(x, y, z);
+        m.castShadow = true;
+        t.add(m);
+      };
+      puff(leaf, 0.34, 0, 0.62, 0);
+      puff(leaf2, 0.26, 0.2, 0.78, 0.08);
+      puff(leaf, 0.22, -0.18, 0.74, -0.06);
+      t.position.set(-(W + gw) / 2 - 0.55, 0, 0.15);
+      root.add(t);
     }
 
     pivot.position.x = -x0 * 0.15;
@@ -804,13 +860,47 @@ export function mount(host, opts = {}) {
     sphere = { cx, cy, cz, r: rad * 1.04 };
   }
 
-  function targetDist() {
-    if (!sphere) return 14;
+  let fitKey = '';
+  let fitDist = 14;
+  function sphereDist() {
     const half = THREE.MathUtils.degToRad(VIEW.fov / 2);
     const tanV = Math.tan(half);
     const tanH = tanV * Math.max(0.4, camera.aspect || 1.4);
-    const ang = Math.atan(Math.min(tanV, tanH) * 0.93);
+    const ang = Math.atan(Math.min(tanV, tanH) * 0.96);
     return sphere.r / Math.max(0.12, Math.sin(ang));
+  }
+  function targetDist() {
+    if (!sphere) return 14;
+    const key = (camera.aspect || 1).toFixed(3) + ':' + sphere.r.toFixed(3) + ':' + sphere.cx.toFixed(2) + ':' + sphere.cz.toFixed(2);
+    if (key === fitKey) return fitDist;
+    const upper = sphereDist();
+    const savedYaw = yaw, savedEl = el;
+    const yaws = [0, Math.PI / 5, Math.PI / 2, Math.PI, Math.PI * 1.25, Math.PI * 1.5, Math.PI * 1.75];
+    const els = [EL_MIN, VIEW.el, EL_MAX];
+    const fits = d => {
+      for (const az of yaws) {
+        for (const e of els) {
+          yaw = VIEW.az - az;
+          el = e;
+          applyCamera(d);
+          const cov = projectSpan(0.84);
+          if (!cov || cov.outside) return false;
+        }
+      }
+      return true;
+    };
+    let lo = upper * 0.38, hi = upper;
+    if (!fits(hi)) hi = upper * 1.35;
+    for (let i = 0; i < 11; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) hi = mid;
+      else lo = mid;
+    }
+    yaw = savedYaw;
+    el = savedEl;
+    fitKey = key;
+    fitDist = hi;
+    return fitDist;
   }
   function springStep(x, v, target, k, c, dt) {
     const nv = v + (k * (target - x) - c * v) * dt;
@@ -859,7 +949,14 @@ export function mount(host, opts = {}) {
 
   let viewW = -1, viewH = -1;
   function resize(fromObserver) {
-    const w = host.clientWidth || 360, h = Math.round(Math.min(w / 1.48, (window.innerHeight || 700) * (w >= 960 ? 0.62 : 0.38)));
+    const w = host.clientWidth || 360;
+    // The stage column is narrower than the window, so desktop has to be
+    // detected from the viewport. A taller canvas keeps the house from sitting
+    // in a short wide strip.
+    const wide = (window.innerWidth || w) >= 960;
+    const cap = wide ? w / 1.12 : w / 1.48;
+    const vh = (window.innerHeight || 700) * (wide ? 0.74 : 0.38);
+    const h = Math.round(Math.min(cap, vh));
     // A language switch can notify the observer without changing the drawing size.
     // Skip that so the camera is not framed again. A real rebuild still reframes.
     if (fromObserver && (!host.clientWidth || (w === viewW && h === viewH))) return;
