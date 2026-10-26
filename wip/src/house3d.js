@@ -30,65 +30,70 @@ export function mount(host, opts = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, context: glContext, antialias: true, alpha: false, powerPreference: 'high-performance', stencil: false });
   const gl = renderer.getContext();
   renderer.setClearAlpha(1);
-  const gpuInfo = gl.getExtension('WEBGL_debug_renderer_info');
-  const gpuName = gpuInfo ? String(gl.getParameter(gpuInfo.UNMASKED_RENDERER_WEBGL) || '') : '';
-  const weakGpu = /swiftshader|llvmpipe|softpipe|software|microsoft basic render/i.test(gpuName);
   const dprCap = 2;
   const msaa = !!(gl.getContextAttributes() && gl.getContextAttributes().antialias);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.02;
+  // Flat, like the estimator canvas. Neutral mapping was lifting the shade side
+  // until the walls read as a white coat.
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(30, 1.5, 0.8, 48);
-  const hemi = new THREE.HemisphereLight(0xfff7f0, 0xd0d8d6, 2.5);
-  const sun = new THREE.DirectionalLight(0xffe4c4, 3.35);
-  sun.position.set(5.2, 9.4, 6.6);
+  const camera = new THREE.PerspectiveCamera(30, 1.5, 0.2, 80);
+  const PI = Math.PI;
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x262626, 0.78 * PI);
+  const sun = new THREE.DirectionalLight(0xffffff, 0.62 * PI);
+  sun.position.set(7.2, 18, 11);
   sun.castShadow = true;
-  sun.shadow.camera.near = 2;
-  sun.shadow.camera.far = 28;
-  sun.shadow.camera.left = -11;
-  sun.shadow.camera.right = 11;
-  sun.shadow.camera.top = 11;
-  sun.shadow.camera.bottom = -11;
-  sun.shadow.mapSize.set(weakGpu ? 512 : 1024, weakGpu ? 512 : 1024);
-  sun.shadow.bias = -0.00025;
-  sun.shadow.normalBias = 0.045;
-  sun.shadow.radius = 2.5;
-  scene.add(hemi, sun);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 80;
+  sun.shadow.camera.left = -14;
+  sun.shadow.camera.right = 14;
+  sun.shadow.camera.top = 14;
+  sun.shadow.camera.bottom = -14;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.035;
+  const fill = new THREE.DirectionalLight(0xffffff, 0.22 * PI);
+  fill.position.set(-12, 8, -7);
+  scene.add(hemi, sun, fill);
+  sun.target.position.set(0, 1.4, 0);
+  scene.add(sun.target);
   const themeDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
-  const stageCur = new THREE.Color(0xe2e6e7);
-  const STAGE_LIGHT = new THREE.Color(0xe2e6e7);
-  const STAGE_DARK = new THREE.Color(0x313940);
-  const HEMI_L = new THREE.Color(0xfff7f0), HEMI_D = new THREE.Color(0xfff4e8);
-  const GROUND_L = new THREE.Color(0xd0d8d6), GROUND_D = new THREE.Color(0x9aa4a8);
-  const SUN_L = new THREE.Color(0xffe4c4), SUN_D = new THREE.Color(0xffe8cc);
-  const groundU = { radius: { value: 6 } };
-  scene.background = stageCur;
-  scene.fog = new THREE.Fog(0xe2e6e7, 8000, 12000);
+  const bgCur = new THREE.Color(0xeceeee);
+  const BG_LIGHT = new THREE.Color(0xeceeee);
+  const BG_DARK = new THREE.Color(0x121618);
+  scene.background = bgCur;
+  scene.fog = new THREE.Fog(0xeceeee, 8000, 12000);
   let themeUntil = 0;
-  // 1 = light, 0 = dark, taken from the stage colour that is already on screen
+  let shadowMat = null;
+  let contactMat = null;
+  // 1 = light, 0 = dark, taken from the page colour that is already on screen
   function themeMix() {
-    const span = STAGE_LIGHT.r - STAGE_DARK.r;
-    return THREE.MathUtils.clamp(span ? (stageCur.r - STAGE_DARK.r) / span : 1, 0, 1);
+    const span = BG_LIGHT.r - BG_DARK.r;
+    return THREE.MathUtils.clamp(span ? (bgCur.r - BG_DARK.r) / span : 1, 0, 1);
   }
   function applySceneTheme() {
     const t = themeMix();
-    hemi.color.copy(HEMI_D).lerp(HEMI_L, t);
-    hemi.groundColor.copy(GROUND_D).lerp(GROUND_L, t);
-    hemi.intensity = 3.05 + (2.5 - 3.05) * t;
-    sun.color.copy(SUN_D).lerp(SUN_L, t);
-    sun.intensity = 4.05 + (3.35 - 4.05) * t;
+    hemi.color.set(0xffffff);
+    hemi.groundColor.set(0x262626);
+    hemi.intensity = 0.78 * PI;
+    sun.color.set(0xffffff);
+    sun.intensity = 0.62 * PI;
+    fill.color.set(0xffffff);
+    fill.intensity = 0.22 * PI;
+    if (shadowMat) shadowMat.opacity = 0.4 + (0.25 - 0.4) * t;
+    if (contactMat) contactMat.color.setRGB(1 - t, 1 - t, 1 - t);
   }
   function sampleStage() {
-    const raw = getComputedStyle(document.documentElement).getPropertyValue('--stage').trim();
-    if (raw) stageCur.set(raw);
-    else stageCur.set(themeDark() ? 0x313940 : 0xe2e6e7);
-    renderer.setClearColor(stageCur, 1);
-    scene.fog.color.copy(stageCur);
-    canvas.style.backgroundColor = raw || (themeDark() ? '#313940' : '#e2e6e7');
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    if (raw) bgCur.set(raw);
+    else bgCur.copy(themeDark() ? BG_DARK : BG_LIGHT);
+    renderer.setClearColor(bgCur, 1);
+    scene.fog.color.copy(bgCur);
+    canvas.style.backgroundColor = raw || (themeDark() ? '#121618' : '#eceeee');
     applySceneTheme();
   }
   function syncTheme() {
@@ -118,7 +123,7 @@ export function mount(host, opts = {}) {
   pivot.add(root);
 
   let parts = {}, fxList = [], spec = null, sel = {}, radius = 6, framePts = null;
-  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: col(c), roughness: 0.8, metalness: 0, flatShading: true, ...o });
+  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: col(c), roughness: 0.92, metalness: 0, flatShading: true, ...o });
   const decalMat = (c, opacity) => new THREE.MeshBasicMaterial({
     color: col(c), transparent: true, opacity, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10,
@@ -148,6 +153,42 @@ export function mount(host, opts = {}) {
     return m;
   }
   // grime overlay: fades, shrinks, or falls as the part gets clean
+  // Soften a slab into the page colour at its far local +z end. Colour mix, not
+  // alpha, so the end does not sort or flicker.
+  function paveFade(mat, half) {
+    mat.customProgramCacheKey = () => 'gleam-pave-fade';
+    mat.onBeforeCompile = shader => {
+      shader.uniforms.uBg = { value: bgCur };
+      shader.uniforms.uHalf = { value: Math.max(0.2, half) };
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vFadeP;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFadeP = position;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vFadeP;\nuniform vec3 uBg;\nuniform float uHalf;')
+        .replace('#include <fog_fragment>', `#include <fog_fragment>
+          float fadeT = smoothstep(0.55, 1.02, vFadeP.z / max(uHalf, 0.001));
+          vec3 bgLin = max(uBg, vec3(0.0));
+          vec3 bgSRGB = mix(bgLin * 12.92, 1.055 * pow(bgLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), bgLin));
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, bgSRGB, fadeT);`);
+    };
+    return mat;
+  }
+  function contactTexture() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d');
+    const gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gr.addColorStop(0, 'rgba(255,255,255,0.085)');
+    gr.addColorStop(0.55, 'rgba(255,255,255,0.028)');
+    gr.addColorStop(0.78, 'rgba(255,255,255,0.008)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 256, 256);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+  const contactTex = contactTexture();
   function grime(p, mesh, mode) {
     mesh.renderOrder = 4;
     mesh.userData.mode = mode;
@@ -184,35 +225,41 @@ export function mount(host, opts = {}) {
     const gw = s.garage ? (s.garage > 80 ? 1.9 : 1.3) : 0;
     const x0 = -(W + gw) / 2 + W / 2; // main body centre
     const front = Dp / 2;
+    // Garage sits beside the body. Its back face steps past the house back so the
+    // two walls are not coplanar.
+    let gDepth = 0, gZ = 0, gFront = front, gBack = -front;
+    if (gw) {
+      gDepth = Dp * 0.82;
+      gBack = -front - 0.1;
+      gFront = gBack + gDepth;
+      gZ = (gBack + gFront) / 2;
+    }
+    radius = Math.max(4.2, (W + gw) * 0.55 + Dp * 0.45);
 
-    // ground. A finite disc. The outer ring fades to the stage colour so the cream
-    // plate does not meet the panel as a hard edge in either theme.
-    radius = Math.max(5.2, (W + gw) * 0.9 + 1.5);
-    groundU.radius.value = radius;
-    const lawnMat = M(C.lawn, { roughness: 1, flatShading: false });
-    lawnMat.customProgramCacheKey = () => 'gleam-ground';
-    lawnMat.onBeforeCompile = shader => {
-      shader.uniforms.uStage = { value: stageCur };
-      shader.uniforms.uRadius = groundU.radius;
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vGroundP;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundP = position.xy;');
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vGroundP;\nuniform vec3 uStage;\nuniform float uRadius;')
-        .replace('#include <fog_fragment>', `#include <fog_fragment>
-          float gDist = length(vGroundP) / max(uRadius, 0.001);
-          float gFade = smoothstep(0.72, 0.96, gDist);
-          vec3 stageLin = max(uStage, vec3(0.0));
-          vec3 stageSRGB = mix(stageLin * 12.92, 1.055 * pow(stageLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), stageLin));
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, stageSRGB, gFade);`);
-    };
-    const lawn = new THREE.Mesh(new THREE.CircleGeometry(radius, 64), lawnMat);
-    lawn.rotation.x = -Math.PI / 2;
-    lawn.position.y = -0.004;
-    lawn.receiveShadow = true;
-    lawn.castShadow = false;
-    lawn.userData.plate = radius;
-    root.add(lawn);
+    // Contact shade stays inside the footprint. Its centre is the brightest
+    // part of the gradient, so it has to sit under the building, not beside it.
+    const cx = x0 + gw / 2;
+    contactMat = new THREE.MeshBasicMaterial({ map: contactTex, transparent: true, depthWrite: false, toneMapped: false });
+    const contact = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), contactMat);
+    contact.rotation.x = -Math.PI / 2;
+    contact.position.set(cx, -0.02, 0);
+    contact.scale.set((W + gw) * 0.86, Dp * 0.86, 1);
+    contact.renderOrder = -2;
+    contact.castShadow = false;
+    contact.receiveShadow = false;
+    contact.userData.ground = true;
+    root.add(contact);
+    shadowMat = new THREE.ShadowMaterial({ opacity: themeDark() ? 0.4 : 0.25, depthWrite: false });
+    const catcher = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shadowMat);
+    catcher.rotation.x = -Math.PI / 2;
+    catcher.position.set(cx, -0.012, 0);
+    catcher.scale.set((W + gw) * 1.8, Dp * 2.4, 1);
+    catcher.renderOrder = -1;
+    catcher.castShadow = false;
+    catcher.receiveShadow = true;
+    catcher.userData.ground = true;
+    root.add(catcher);
+    applySceneTheme();
     const paveOf = mat => { mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -2; return mat; };
     const slab = (parent, w, h, d, mat, x, z, yBottom, order) => {
       const m = box(w, h, d, mat, x, yBottom + h / 2, z);
@@ -237,9 +284,9 @@ export function mount(host, opts = {}) {
 
     // walls
     const pw = part('walls');
-    const wallMat = dirtyMat(pw, C.wallDirty, C.wall, { roughness: 0.76 });
+    const wallMat = dirtyMat(pw, C.wallDirty, C.wall, { roughness: 0.94 });
     pw.g.add(box(W, H, Dp, wallMat, x0, H / 2, 0));
-    if (gw) pw.g.add(box(gw, 1.0, Dp * 0.85, wallMat, gx, 0.5, -Dp * 0.075));
+    if (gw) pw.g.add(box(gw, 1.0, gDepth, wallMat, gx, 0.5, gZ));
     if (s.apt) for (let f = 1; f < s.floors; f++) pw.g.add(box(W + 0.12, 0.06, Dp + 0.12, wallMat, x0, f * FH, 0));
     const streakMat = () => decalMat(C.streak, 0.28);
     for (let i = 0; i < 7 + s.bays * 2; i++) {
@@ -250,33 +297,52 @@ export function mount(host, opts = {}) {
     { const m = new THREE.Mesh(new THREE.PlaneGeometry(W, 0.22), decalMat(C.moss, 0.35));
       m.position.set(x0, 0.12, front + 0.012); grime(pw, m, 'fade'); }
 
-    // door, sunk into the wall and the lawn
-    root.add(box(0.5, 0.86, 0.08, M(C.door), x0 + (s.bays > 2 ? 0 : -W / 4 + 0.1), 0.41, front + 0.01));
-    if (gw) root.add(box(gw - 0.25, 0.8, 0.08, M(C.garage), gx, 0.38, -Dp * 0.075 + Dp * 0.425 + 0.01));
+    // doors sit just proud of the wall so the faces are not coplanar
+    const doorX = x0 + (s.bays > 2 ? 0 : -W / 4 + 0.1);
+    root.add(box(0.5, 0.86, 0.08, M(C.door), doorX, 0.41, front + 0.04));
+    root.add(box(0.46, 0.8, 0.08, M(C.door), doorX, 0.4, -front - 0.04));
+    if (gw) root.add(box(gw - 0.25, 0.8, 0.08, M(C.garage), gx, 0.38, gFront + 0.04));
 
     // windows
     const pwin = part('windows');
     const glassMat = dirtyMat(pwin, C.glassDirty, C.glass, { roughness: 0.16, metalness: 0.04, emissive: col('#000000') });
-    const frameMat = M(C.frame);
+    const frameMat = M(C.frame, { roughness: 0.92 });
     const doorBay = s.bays > 2 ? Math.floor(s.bays / 2) : 0;
+    const winFace = (wx, wy, wz, out) => {
+      pwin.g.add(box(0.62, 0.58, 0.08, frameMat, wx, wy, wz));
+      pwin.g.add(box(0.52, 0.48, 0.04, glassMat, wx, wy, wz + out * 0.035));
+    };
     for (let f = 0; f < s.floors; f++) {
       for (let b = 0; b < s.bays; b++) {
-        if (f === 0 && b === doorBay) continue;
         const wx = x0 - W / 2 + 0.2 + bay * (b + 0.5), wy = f * FH + 0.55;
-        pwin.g.add(box(0.62, 0.58, 0.08, frameMat, wx, wy, front + 0.02));
-        pwin.g.add(box(0.52, 0.48, 0.04, glassMat, wx, wy, front + 0.055));
-        const dust = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.2), decalMat(C.grime, 0.32));
-        dust.position.set(wx, wy - 0.13, front + 0.1); grime(pwin, dust, 'fade');
+        if (!(f === 0 && b === doorBay)) {
+          winFace(wx, wy, front + 0.02, 1);
+          const dust = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.2), decalMat(C.grime, 0.32));
+          dust.position.set(wx, wy - 0.13, front + 0.1); grime(pwin, dust, 'fade');
+          winFace(wx, wy, -front - 0.02, -1);
+        }
       }
-      if (!s.neigh) {
-        const sxp = x0 + (gw ? -1 : 1) * (W / 2 + 0.05);
-        const g = box(0.06, 0.48, 0.52, glassMat, sxp, f * FH + 0.55, 0.2); pwin.g.add(g);
+    }
+    const sideWin = (sign, z) => {
+      const sx = x0 + sign * (W / 2 + 0.045);
+      for (let f = 0; f < s.floors; f++) {
+        const wy = f * FH + 0.55;
+        pwin.g.add(box(0.06, 0.42, 0.46, frameMat, sx, wy, z));
+        pwin.g.add(box(0.03, 0.32, 0.34, glassMat, sx + sign * 0.025, wy, z));
       }
+    };
+    if (s.neigh !== 'left' && s.neigh !== 'both') { sideWin(-1, -0.25); sideWin(-1, 0.45); }
+    if (!gw && s.neigh !== 'both') { sideWin(1, -0.25); sideWin(1, 0.45); }
+    if (gw) {
+      pwin.g.add(box(0.46, 0.32, 0.06, frameMat, gx, 0.58, gBack - 0.04));
+      pwin.g.add(box(0.34, 0.22, 0.03, glassMat, gx, 0.58, gBack - 0.06));
+      pwin.g.add(box(0.06, 0.36, 0.4, frameMat, gx + gw / 2 + 0.04, 0.58, gZ));
+      pwin.g.add(box(0.03, 0.26, 0.28, glassMat, gx + gw / 2 + 0.06, 0.58, gZ));
     }
 
     // roof, dropped into the wall so the soffit is not coplanar with the wall top
     const pr = part('roof');
-    const roofMat = dirtyMat(pr, C.roofDirty, C.roof, { roughness: 0.78 });
+    const roofMat = dirtyMat(pr, C.roofDirty, C.roof, { roughness: 0.9, flatShading: true });
     const RH = 0.85, RD = Dp + 0.3, RW = W + 0.3;
     const roofSink = 0.05;
     let slope = 0;
@@ -292,11 +358,11 @@ export function mount(host, opts = {}) {
         m.rotation.x = -Math.PI / 2; m.position.set(x0 + (r() - 0.5) * (W - 0.4), H + 0.095, (r() - 0.5) * (Dp - 0.4));
         grime(pr, m, 'fade');
       }
-      if (gw) pr.g.add(box(gw + 0.06, 0.08, Dp * 0.85 + 0.06, roofMat, gx, 0.98, -Dp * 0.075));
+      if (gw) pr.g.add(box(gw + 0.06, 0.08, gDepth + 0.06, roofMat, gx, 0.98, gZ));
     } else {
       const roof = s.neigh ? gable(RW, RD, RH, roofMat) : hip(RW, RD, RH, roofMat);
       roof.position.set(x0, H - roofSink, 0); pr.g.add(roof);
-      if (gw) { const gr = gable(gw + 0.2, Dp * 0.85 + 0.2, 0.45, roofMat); gr.position.set(gx, 0.94, -Dp * 0.075); pr.g.add(gr); }
+      if (gw) { const gr = gable(gw + 0.2, gDepth + 0.16, 0.45, roofMat); gr.position.set(gx, 0.94, gZ); pr.g.add(gr); }
       slope = Math.atan2(RH, RD / 2);
       const mossMat = new THREE.MeshStandardMaterial({ color: col(C.moss), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
       const ny = Math.cos(slope), nz = Math.sin(slope);
@@ -309,6 +375,16 @@ export function mount(host, opts = {}) {
         m.castShadow = false;
         grime(pr, m, 'shrink');
       }
+    }
+    // Chimney, embedded in the roof so the join is closed from every side.
+    {
+      const chim = dirtyMat(pr, C.wallDirty, C.wall, { roughness: 0.94 });
+      const cap = dirtyMat(pr, C.roofDirty, C.roof, { roughness: 0.9, flatShading: true });
+      const cx = x0 + Math.min(0.7, W * 0.22);
+      const ch = 0.58;
+      const cy = flat ? H + 0.16 + ch / 2 : H - roofSink + RH * 0.62;
+      pr.g.add(box(0.32, ch, 0.32, chim, cx, cy, flat ? 0.15 : 0));
+      pr.g.add(box(0.4, 0.07, 0.4, cap, cx, cy + ch / 2 + 0.02, flat ? 0.15 : 0));
     }
 
     // solar panels, lifted along the roof normal
@@ -335,49 +411,65 @@ export function mount(host, opts = {}) {
     ps.g.add(arr);
     arr.children.filter(c => c.userData.local).forEach(d => { d.userData.mode = 'fade'; d.userData.o0 = d.material.opacity; d.userData.p0 = d.position.clone(); d.userData.s0 = d.scale.clone(); ps.dirt.push(d); });
 
-    // gutters sit in front of the eave, leaves rest on the gutter rather than inside the roof
+    // Gutters run around the eaves, with a downpipe at each open corner.
     const pg = part('gutters');
-    const gutMat = dirtyMat(pg, C.gutDirty, C.gut);
-    if (flat) {
-      for (let i = 0; i < Math.max(2, s.bays - 1); i++) {
-        const sx = x0 - W / 2 + 0.6 + i * ((W - 1.2) / Math.max(1, Math.max(2, s.bays - 1) - 1));
-        pg.g.add(box(0.1, 0.08, 0.4, gutMat, sx, H + 0.1, front + 0.28));
-        const stain = new THREE.Mesh(new THREE.PlaneGeometry(0.16, H * 0.7), decalMat(C.streak, 0.3));
-        stain.position.set(sx, H * 0.62, front + 0.012); grime(pg, stain, 'fade');
+    const gutMat = dirtyMat(pg, C.gutDirty, C.gut, { roughness: 0.9 });
+    {
+      const gutH = 0.08, gutD = 0.1;
+      const gutY = flat ? H + 0.02 : H - 0.16;
+      const zE = (flat ? front + 0.08 : RD / 2 + 0.02) + gutD / 2;
+      const xL = x0 - (flat ? W / 2 + 0.06 : RW / 2) - gutD / 2;
+      const xR = x0 + (flat ? W / 2 + 0.06 : RW / 2) + gutD / 2;
+      const span = xR - xL;
+      pg.g.add(box(span, gutH, gutD, gutMat, x0, gutY, zE - gutD / 2));
+      pg.g.add(box(span, gutH, gutD, gutMat, x0, gutY, -(zE - gutD / 2)));
+      // Hip roofs and flat parapets have side eaves. A gable end does not.
+      if (flat || !s.neigh) {
+        if (s.neigh !== 'left' && s.neigh !== 'both') pg.g.add(box(gutD, gutH, zE * 2, gutMat, xL, gutY, 0));
+        if (s.neigh !== 'both') pg.g.add(box(gutD, gutH, zE * 2, gutMat, xR, gutY, 0));
       }
-    } else {
-      const gutH = 0.08, gutD = 0.1, gutZ = RD / 2 + 0.04 + gutD / 2, gutY = H - 0.16;
-      pg.g.add(box(RW + 0.05, gutH, gutD, gutMat, x0, gutY, gutZ));
-      const pipeTop = gutY - gutH / 2, pipeH = pipeTop + 0.04;
-      const pipe = (x) => pg.g.add(box(0.06, pipeH, 0.06, gutMat, x, pipeTop - pipeH / 2, gutZ));
-      pipe(x0 - W / 2 + 0.08);
-      if (!s.neigh) pipe(x0 + W / 2 - 0.08);
-      const leafMat = new THREE.MeshStandardMaterial({ color: col(C.leaf), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
-      for (let i = 0; i < 10 + s.bays * 3; i++) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.02, 0.05), leafMat);
-        m.position.set(x0 + (r() - 0.5) * (RW - 0.2), gutY + gutH / 2 + 0.012, gutZ + (r() - 0.5) * 0.04);
-        m.rotation.set(r() * 0.4, r() * 3, r() * 0.4);
-        m.castShadow = false;
-        grime(pg, m, 'fall');
+      const pipeTop = gutY - gutH / 2, pipeH = Math.max(0.4, pipeTop + 0.02);
+      const pipe = (x, z) => pg.g.add(box(0.06, pipeH, 0.06, gutMat, x, pipeTop - pipeH / 2, z));
+      pipe(xL + 0.12, zE - gutD);
+      pipe(xL + 0.12, -(zE - gutD));
+      if (!s.neigh) { pipe(xR - 0.12, zE - gutD); pipe(xR - 0.12, -(zE - gutD)); }
+      if (!flat) {
+        const leafMat = new THREE.MeshStandardMaterial({ color: col(C.leaf), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+        for (let i = 0; i < 8 + s.bays * 2; i++) {
+          const m = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.02, 0.05), leafMat);
+          const frontLeaf = r() > 0.45;
+          m.position.set(x0 + (r() - 0.5) * (span - 0.3), gutY + gutH / 2 + 0.012, (frontLeaf ? 1 : -1) * (zE - gutD) + (r() - 0.5) * 0.04);
+          m.rotation.set(r() * 0.4, r() * 3, r() * 0.4);
+          m.castShadow = false;
+          grime(pg, m, 'fall');
+        }
+      } else {
+        for (let i = 0; i < Math.max(2, s.bays - 1); i++) {
+          const sx = x0 - W / 2 + 0.6 + i * ((W - 1.2) / Math.max(1, Math.max(2, s.bays - 1) - 1));
+          const stain = new THREE.Mesh(new THREE.PlaneGeometry(0.16, H * 0.7), decalMat(C.streak, 0.3));
+          stain.position.set(sx, H * 0.62, front + 0.02); grime(pg, stain, 'fade');
+        }
       }
     }
 
     // driveway, patio and path each have their own height. Dirt sits just above its own slab.
     const pd = part('driveway');
-    const paveMat = paveOf(dirtyMat(pd, C.paveDirty, C.pave));
-    const dw = gw ? gw + 0.3 : 1.3, dx = gw ? gx : x0 + W / 2 - dw / 2 - 0.05, dl = radius - front - 0.3;
-    const driveTop = slab(pd.g, dw, 0.028, dl, paveMat, dx, front + dl / 2, 0.1, 2);
+    const dw = gw ? gw + 0.3 : 1.3, dx = gw ? gx : x0 + W / 2 - dw / 2 - 0.05, dl = 1.7;
+    const paveMat = paveFade(paveOf(dirtyMat(pd, C.paveDirty, C.pave, { roughness: 0.93 })), dl / 2);
+    const driveTop = slab(pd.g, dw, 0.028, dl, paveMat, dx, front + dl / 2 + 0.05, 0.02, 2);
     for (let i = 0; i < 6; i++) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(0.1 + r() * 0.2, 8), decalMat(C.grime, 0.45));
-      m.rotation.x = -Math.PI / 2; m.position.set(dx + (r() - 0.5) * (dw - 0.3), driveTop + 0.016, front + 0.3 + r() * (dl - 0.6)); m.scale.set(1, 1 + r(), 1);
+      const m = new THREE.Mesh(new THREE.CircleGeometry(0.1 + r() * 0.16, 8), decalMat(C.grime, 0.45));
+      m.rotation.x = -Math.PI / 2; m.position.set(dx + (r() - 0.5) * (dw - 0.3), driveTop + 0.012, front + 0.25 + r() * (dl * 0.55)); m.scale.set(1, 1 + r(), 1);
       grime(pd, m, 'fade');
     }
 
     const pp = part('patio');
-    const patMat = paveOf(dirtyMat(pp, C.paveDirty, C.pave));
+    const patMat = paveOf(dirtyMat(pp, C.paveDirty, C.pave, { roughness: 0.93 }));
+    const pathLen = 1.05;
+    const pathMat = paveFade(paveOf(dirtyMat(pp, C.paveDirty, C.pave, { roughness: 0.93 })), pathLen / 2);
     const px = gw || s.neigh ? x0 - W / 2 + 0.75 : x0 - W / 2 - 0.1;
-    const patioTop = slab(pp.g, 1.4, 0.024, 1.3, patMat, px, front + 0.95, 0.028, 1);
-    const pathTop = slab(pp.g, 0.5, 0.02, 1.0, patMat, x0 + (s.bays > 2 ? 0 : -W / 4 + 0.1), front + 0.5, 0.175, 3);
+    const patioTop = slab(pp.g, 1.4, 0.024, 1.3, patMat, px, front + 0.85, 0.012, 1);
+    const pathTop = slab(pp.g, 0.5, 0.02, pathLen, pathMat, doorX, front + pathLen / 2 + 0.02, 0.045, 3);
     for (let i = 0; i < 4; i++) {
       const m = new THREE.Mesh(new THREE.CircleGeometry(0.08 + r() * 0.14, 7), decalMat(i % 2 ? C.moss : C.grime, 0.45));
       m.rotation.x = -Math.PI / 2; m.position.set(px + (r() - 0.5) * 1.0, patioTop + 0.016, front + 0.55 + r() * 0.7);
@@ -398,6 +490,17 @@ export function mount(host, opts = {}) {
     }
 
     pivot.position.x = -x0 * 0.15;
+    const span = Math.max(W + gw, H + 2, Dp);
+    const sds = Math.max(8, span * 0.95);
+    sun.shadow.camera.left = -sds;
+    sun.shadow.camera.right = sds;
+    sun.shadow.camera.top = sds;
+    sun.shadow.camera.bottom = -sds;
+    sun.shadow.camera.updateProjectionMatrix();
+    sun.position.set(span * 0.45 + 6, H + 14, span * 0.5 + 8);
+    fill.position.set(-span - 5, H * 0.7 + 5, -span * 0.35 - 4);
+    sun.target.position.set(0, H * 0.35, 0);
+    sun.target.updateMatrixWorld();
     Object.values(parts).forEach(applyClean);
     captureFrame();
     resize();
@@ -509,9 +612,12 @@ export function mount(host, opts = {}) {
     });
   }
 
-  // drag to turn, tap to toggle. Rotation eases toward the pointer so a coarse drag stays smooth.
-  let rot = 0, rotT = 0, vel = 0, drag = null, lastInput = -1e9;
-  const clampRot = v => Math.max(-1, Math.min(1, v));
+  // Orbit the camera. Yaw is unbounded. Elevation tilts, clamped like the estimator.
+  const VIEW = { az: 0.42, el: 0.37, sway: 0.26, swaySpeed: 0.2, fov: 30 };
+  const EL_MIN = 0.05, EL_MAX = 0.95;
+  let yaw = 0, yawT = 0, velYaw = 0, el = VIEW.el, elT = VIEW.el, velEl = 0;
+  let drag = null, lastInput = -1e9, idlePhase = 0, hold = false;
+  let sphere = null, dist = NaN, distV = 0;
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   function pick(x, y) {
     const b = canvas.getBoundingClientRect();
@@ -526,41 +632,53 @@ export function mount(host, opts = {}) {
     return null;
   }
   canvas.addEventListener('pointerdown', e => {
-    try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* pointer already gone */ }
-    drag = { x: e.clientX, y: e.clientY, r: rotT, t: performance.now(), moved: false, lt: performance.now() };
-    vel = 0;
+    hold = false;
+    drag = { x: e.clientX, y: e.clientY, yaw: yawT, el: elT, t: performance.now(), moved: false, lt: performance.now(), mode: null, pid: e.pointerId, type: e.pointerType, captured: false };
+    velYaw = 0; velEl = 0;
     lastInput = performance.now();
   });
   canvas.addEventListener('pointermove', e => {
-    if (!drag) { if (e.pointerType === 'mouse') canvas.style.cursor = pick(e.clientX, e.clientY) ? 'pointer' : ''; return; }
-    const dx = e.clientX - drag.x;
-    if (Math.abs(dx) > 6) drag.moved = true;
-    if (drag.moved) {
-      const next = clampRot(drag.r + dx * 0.008);
-      const now = performance.now();
-      const dtm = Math.max(8, now - drag.lt) / 1000;
-      vel = Math.max(-2.4, Math.min(2.4, (next - rotT) / dtm));
-      drag.lt = now;
-      rotT = next;
-      lastInput = now;
+    if (!drag || drag.pid !== e.pointerId) {
+      if (!drag && e.pointerType === 'mouse') canvas.style.cursor = pick(e.clientX, e.clientY) ? 'pointer' : 'grab';
+      return;
     }
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.mode) {
+      if (Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
+      // A vertical swipe scrolls the page. A drag that leads sideways is a turn,
+      // and its vertical part tilts. Mouse always orbits.
+      if (drag.type !== 'mouse' && Math.abs(dy) > Math.abs(dx) * 1.25 && Math.abs(dx) < 16) drag.mode = 'scroll';
+      else drag.mode = 'orbit';
+      if (drag.mode === 'scroll') drag.moved = true;
+    }
+    if (drag.mode !== 'orbit') return;
+    if (!drag.captured) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* pointer already gone */ }
+      drag.captured = true;
+    }
+    drag.moved = true;
+    const nextYaw = drag.yaw + dx * 0.008;
+    const nextEl = Math.max(EL_MIN, Math.min(EL_MAX, drag.el + dy * 0.0045));
+    const now = performance.now();
+    const dtm = Math.max(8, now - drag.lt) / 1000;
+    velYaw = Math.max(-2.8, Math.min(2.8, (nextYaw - yawT) / dtm));
+    velEl = Math.max(-1.4, Math.min(1.4, (nextEl - elT) / dtm));
+    drag.lt = now;
+    yawT = nextYaw;
+    elT = nextEl;
+    lastInput = now;
   });
   const end = e => {
-    if (!drag) return;
+    if (!drag || (e && drag.pid !== e.pointerId)) return;
     const d = drag; drag = null;
+    if (d.mode === 'scroll') return;
     if (!d.moved && performance.now() - d.t < 600) { const id = pick(e.clientX, e.clientY); if (id && opts.onTap) opts.onTap(id); }
   };
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', () => { drag = null; });
 
   const _pivotPos = new THREE.Vector3();
-  const _target = new THREE.Vector3();
-  const _viewDir = new THREE.Vector3(0.04, 0.38, 1).normalize();
-  const _world = new THREE.Vector3();
-  const YAWS = [];
-  for (let a = -1; a <= 1.0001; a += 0.1) YAWS.push(a);
-  const YAW_C = YAWS.map(a => Math.cos(a));
-  const YAW_S = YAWS.map(a => Math.sin(a));
+  const _look = new THREE.Vector3();
 
   function captureFrame() {
     pivot.updateWorldMatrix(true, true);
@@ -568,7 +686,7 @@ export function mount(host, opts = {}) {
     const pts = [];
     const corner = new THREE.Vector3();
     root.traverse(o => {
-      if (!o.isMesh || !o.geometry) return;
+      if (!o.isMesh || !o.geometry || o.userData.ground) return;
       const geo = o.geometry;
       if (o.userData.plate) {
         const rad = o.userData.plate;
@@ -599,64 +717,74 @@ export function mount(host, opts = {}) {
       }
     });
     framePts = pts;
+    if (pts.length < 3) { sphere = null; return; }
+    let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (let p = 0; p < pts.length; p += 3) {
+      const x = pts[p], y = pts[p + 1], z = pts[p + 2];
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
+    let rad = 0.001;
+    for (let p = 0; p < pts.length; p += 3) {
+      const d = Math.hypot(pts[p] - cx, pts[p + 1] - cy, pts[p + 2] - cz);
+      if (d > rad) rad = d;
+    }
+    sphere = { cx, cy, cz, r: rad * 1.04 };
   }
 
+  function targetDist() {
+    if (!sphere) return 14;
+    const half = THREE.MathUtils.degToRad(VIEW.fov / 2);
+    const tanV = Math.tan(half);
+    const tanH = tanV * Math.max(0.4, camera.aspect || 1.4);
+    const ang = Math.atan(Math.min(tanV, tanH) * 0.93);
+    return sphere.r / Math.max(0.12, Math.sin(ang));
+  }
+  function springStep(x, v, target, k, c, dt) {
+    const nv = v + (k * (target - x) - c * v) * dt;
+    return [x + nv * dt, nv];
+  }
+  function applyCamera(d) {
+    if (!sphere) return;
+    const az = VIEW.az - yaw;
+    const ce = Math.cos(el);
+    pivot.getWorldPosition(_pivotPos);
+    _look.set(_pivotPos.x + sphere.cx, _pivotPos.y + sphere.cy, _pivotPos.z + sphere.cz);
+    camera.position.set(
+      _look.x + Math.sin(az) * ce * d,
+      _look.y + Math.sin(el) * d,
+      _look.z + Math.cos(az) * ce * d
+    );
+    camera.up.set(0, 1, 0);
+    camera.lookAt(_look);
+    const near = Math.max(0.08, (d - sphere.r) * 0.45);
+    camera.near = Math.min(near, Math.max(0.08, d * 0.25));
+    camera.far = d + sphere.r * 3.2;
+    camera.fov = VIEW.fov;
+    camera.updateMatrixWorld(true);
+    camera.updateProjectionMatrix();
+  }
   function projectSpan(limit) {
     const pts = framePts;
     if (!pts || pts.length < 3) return null;
-    pivot.getWorldPosition(_pivotPos);
+    pivot.updateWorldMatrix(true, true);
     let maxX = 0, maxY = 0, outside = false;
-    for (let i = 0; i < YAWS.length; i++) {
-      const c = YAW_C[i], s = YAW_S[i];
-      for (let p = 0; p < pts.length; p += 3) {
-        _world.set(
-          _pivotPos.x + pts[p] * c + pts[p + 2] * s,
-          _pivotPos.y + pts[p + 1],
-          _pivotPos.z - pts[p] * s + pts[p + 2] * c
-        ).project(camera);
-        const ax = Math.abs(_world.x), ay = Math.abs(_world.y);
-        if (ax > maxX) maxX = ax;
-        if (ay > maxY) maxY = ay;
-        if (ax > limit || ay > limit || _world.z < -1 || _world.z > 1) outside = true;
-      }
+    const corner = new THREE.Vector3();
+    for (let p = 0; p < pts.length; p += 3) {
+      corner.set(pts[p], pts[p + 1], pts[p + 2]).applyMatrix4(pivot.matrixWorld).project(camera);
+      const ax = Math.abs(corner.x), ay = Math.abs(corner.y);
+      if (ax > maxX) maxX = ax;
+      if (ay > maxY) maxY = ay;
+      if (ax > limit || ay > limit || corner.z < -1 || corner.z > 1) outside = true;
     }
     return { maxX, maxY, outside };
   }
-
   function frameHouse() {
-    const pts = framePts;
-    if (!pts || pts.length < 3) return;
-    pivot.getWorldPosition(_pivotPos);
-    let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-    for (let i = 0; i < YAWS.length; i++) {
-      const c = YAW_C[i], s = YAW_S[i];
-      for (let p = 0; p < pts.length; p += 3) {
-        const x = pts[p] * c + pts[p + 2] * s;
-        const y = pts[p + 1];
-        const z = -pts[p] * s + pts[p + 2] * c;
-        if (x < minX) minX = x; if (x > maxX) maxX = x;
-        if (y < minY) minY = y; if (y > maxY) maxY = y;
-        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
-      }
-    }
-    _target.set(_pivotPos.x + (minX + maxX) / 2, _pivotPos.y + (minY + maxY) / 2, _pivotPos.z + (minZ + maxZ) / 2);
-    const place = dist => {
-      camera.position.copy(_target).addScaledVector(_viewDir, dist);
-      camera.near = Math.max(0.65, dist * 0.2);
-      camera.far = dist * 2.5;
-      camera.lookAt(_target);
-      camera.updateMatrixWorld(true);
-      camera.updateProjectionMatrix();
-    };
-    let lo = 1.5, hi = 80;
-    place(hi);
-    if (projectSpan(0.88).outside) hi = 160;
-    for (let n = 0; n < 18; n++) {
-      const mid = (lo + hi) * 0.5;
-      place(mid);
-      if (projectSpan(0.88).outside) lo = mid; else hi = mid;
-    }
-    place(hi);
+    const td = targetDist();
+    if (Number.isNaN(dist) || td > dist * 1.01) { dist = td; distV = 0; }
+    applyCamera(Number.isNaN(dist) ? td : dist);
   }
 
   let viewW = -1, viewH = -1;
@@ -704,20 +832,39 @@ export function mount(host, opts = {}) {
     ageClean(now);
     stepFx(now, dt);
     if (now < themeUntil) sampleStage();
-    if (drag) {
-      rot += (rotT - rot) * (1 - Math.exp(-dt * 22));
-    } else if (Math.abs(vel) > 0.03 || Math.abs(rotT - rot) > 0.0015) {
-      rotT = clampRot(rotT + vel * dt);
-      if (rotT <= -1 || rotT >= 1) vel = 0;
-      vel *= Math.exp(-dt * 3.4);
-      rot += (rotT - rot) * (1 - Math.exp(-dt * 22));
-      if (Math.abs(vel) <= 0.03) vel = 0;
-    } else if (!reduced && now - lastInput > 2500) {
-      const aim = Math.sin(now / 4200) * 0.32;
-      rot += (aim - rot) * Math.min(1, dt * 0.8);
-      rotT = rot;
+    const orbiting = drag && drag.mode === 'orbit';
+    if (orbiting) {
+      yaw += (yawT - yaw) * (1 - Math.exp(-dt * 22));
+      el += (elT - el) * (1 - Math.exp(-dt * 22));
+    } else if (!drag && (Math.abs(velYaw) > 0.02 || Math.abs(yawT - yaw) > 0.0015 || Math.abs(velEl) > 0.02 || Math.abs(elT - el) > 0.0015)) {
+      yawT += velYaw * dt;
+      elT = Math.max(EL_MIN, Math.min(EL_MAX, elT + velEl * dt));
+      if (elT <= EL_MIN + 1e-4 || elT >= EL_MAX - 1e-4) velEl = 0;
+      velYaw *= Math.exp(-dt * 3.4);
+      velEl *= Math.exp(-dt * 4.2);
+      yaw += (yawT - yaw) * (1 - Math.exp(-dt * 22));
+      el += (elT - el) * (1 - Math.exp(-dt * 22));
+      if (Math.abs(velYaw) <= 0.02) velYaw = 0;
+      if (Math.abs(velEl) <= 0.02) velEl = 0;
+    } else if (!drag && !hold && !reduced && now - lastInput > 2500) {
+      idlePhase += dt * VIEW.swaySpeed;
+      const aimYaw = -VIEW.sway * Math.sin(idlePhase);
+      yaw += (aimYaw - yaw) * (1 - Math.exp(-dt * 0.8));
+      yawT = yaw;
+      el += (VIEW.el - el) * (1 - Math.exp(-dt * 1.4));
+      elT = el;
     }
-    pivot.rotation.y = rot;
+    const td = targetDist();
+    if (Number.isNaN(dist)) dist = td;
+    else if (reduced || td > dist) { dist = td; distV = 0; }
+    else {
+      const n = dt > 0.02 ? 3 : 1;
+      for (let i = 0; i < n; i++) {
+        const stepped = springStep(dist, distV, td, 26, 10, dt / n);
+        dist = stepped[0]; distV = stepped[1];
+      }
+    }
+    applyCamera(dist);
     draw();
   }
   raf = requestAnimationFrame(loop);
@@ -747,8 +894,20 @@ export function mount(host, opts = {}) {
       return null;
     },
     parts: () => Object.keys(parts),
-    setYaw(y) { rot = rotT = clampRot(y); vel = 0; pivot.rotation.y = rot; lastInput = performance.now(); draw(); },
-    coverage() { return projectSpan(0.88); },
+    setYaw(y) {
+      hold = true; yaw = yawT = VIEW.az - y; velYaw = 0; velEl = 0;
+      lastInput = performance.now();
+      applyCamera(Number.isNaN(dist) ? targetDist() : dist);
+      draw();
+    },
+    setTilt(t) {
+      hold = true; el = elT = Math.max(EL_MIN, Math.min(EL_MAX, t)); velEl = 0; velYaw = 0;
+      lastInput = performance.now();
+      applyCamera(Number.isNaN(dist) ? targetDist() : dist);
+      draw();
+    },
+    view() { return { az: VIEW.az - yaw, el, dist }; },
+    coverage() { return projectSpan(0.92); },
     msaa: () => msaa,
     pixelRatio: () => renderer.getPixelRatio(),
     contextAttributes() {

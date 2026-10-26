@@ -130,7 +130,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   await page.fill('#name', 'Yusuf');
   const national = mk.dial === '+966' ? '050 123 4567' : mk.dial === '+64' ? '021 123 4567' : mk.dial === '+353' ? '087 123 4567' : mk.dial === '+44' ? '07700 900123' : mk.dial === '+61' ? '0412 345 678' : '555 010 2030';
   await page.fill('#phone', national);
-  if (w === 1440 && mk.region === 'US') { await page.selectOption('#cc', 'AE'); }
+  if (w === 1440 && mk.region === 'US') { await page.locator('#cc').selectOption('AE', { force: true }); }
   await page.locator('#locBtn').click(); await sleep(1500);
   ok(await page.$eval('#loc', e => e.classList.contains('has')), `${tag} location pin added`);
   // drag the map so the pin moves, then the message must carry the new spot
@@ -249,8 +249,8 @@ ok(!/prefers-color-scheme/.test(src + houseSrc), 'owner: theme does not follow t
 ok(/color-scheme:\s*only light/.test(src) && /color-scheme:\s*only dark/.test(src), 'owner: explicit color scheme for both themes');
 ok(src.indexOf("localStorage.getItem('gleam.theme')") < src.indexOf('<style>'), 'owner: saved theme is applied before first paint');
 ok(/id="themeBtn"/.test(src) && /gleam\.theme/.test(src), 'owner: theme toggle is remembered');
-ok(/background-color:#ECEEEE/.test(src) && /background-color:#F9FAFA/.test(src) && /background-color:#E2E6E7/.test(src), 'owner: explicit light backgrounds');
-ok(/0xe2e6e7/.test(houseSrc) && /0x313940/.test(houseSrc) && /NeutralToneMapping/.test(houseSrc) && /HemisphereLight/.test(houseSrc), 'owner: house stays lit in both themes');
+ok(/background-color:#ECEEEE/.test(src) && /background-color:#F9FAFA/.test(src) && /background-color:var\(--bg\)/.test(src), 'owner: explicit light backgrounds');
+ok(/0xeceeee/.test(houseSrc) && /0x121618/.test(houseSrc) && /NoToneMapping/.test(houseSrc) && /HemisphereLight/.test(houseSrc), 'owner: house clear colour matches the page');
 
 // Light and dark emulation must render the same bright page.
 const { PNG } = await import('pngjs');
