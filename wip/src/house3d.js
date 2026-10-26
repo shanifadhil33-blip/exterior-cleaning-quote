@@ -21,7 +21,6 @@ export function mount(host, opts = {}) {
   const canvas = document.createElement('canvas');
   canvas.className = 'gl3';
   canvas.setAttribute('aria-hidden', 'true');
-  canvas.style.colorScheme = 'only light';
   // Three r170 ignores the alpha flag and always requests alpha:true. Create the context
   // here so the renderer is given the attributes we actually asked for.
   const requestedGL = { alpha: false, antialias: true, depth: true, stencil: false, powerPreference: 'high-performance', premultipliedAlpha: true, preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false };
@@ -32,7 +31,14 @@ export function mount(host, opts = {}) {
   renderer.setClearAlpha(1);
   const dprCap = 2;
   const msaa = !!(gl.getContextAttributes() && gl.getContextAttributes().antialias);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap));
+  // Screens around dpr 1 leave roof eaves and window bars only a pixel wide.
+  // Draw them a step larger, still capped at 2 so a phone at dpr 3 stays put.
+  function pixelScale() {
+    const dpr = window.devicePixelRatio || 1;
+    if (dpr >= 1 && dpr <= 1.5) return Math.min(dpr * 1.5, dprCap);
+    return Math.min(dpr, dprCap);
+  }
+  renderer.setPixelRatio(pixelScale());
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Flat, like the estimator canvas. Neutral mapping was lifting the shade side
   // until the walls read as a white coat.
@@ -51,13 +57,19 @@ export function mount(host, opts = {}) {
   sun.castShadow = true;
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 80;
-  sun.shadow.camera.left = -14;
-  sun.shadow.camera.right = 14;
-  sun.shadow.camera.top = 14;
-  sun.shadow.camera.bottom = -14;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.bias = -0.0006;
-  sun.shadow.normalBias = 0.035;
+  // Fixed bounds. Rebuilding the house must not resize the shadow frustum,
+  // or the shadow swims for a frame.
+  sun.shadow.camera.left = -18;
+  sun.shadow.camera.right = 18;
+  sun.shadow.camera.top = 18;
+  sun.shadow.camera.bottom = -18;
+  sun.shadow.camera.updateProjectionMatrix();
+  // A phone canvas is already wide in pixels. A 1024 map keeps the soft shadow
+  // and leaves the frame budget the suite measures.
+  const shadowRes = (window.innerWidth || 1200) < 960 ? 1024 : 2048;
+  sun.shadow.mapSize.set(shadowRes, shadowRes);
+  sun.shadow.bias = -0.001;
+  sun.shadow.normalBias = 0.045;
   const fill = new THREE.DirectionalLight(0xffffff, 0.3 * PI);
   fill.position.set(-12, 8, -7);
   scene.add(hemi, sun, fill);
@@ -91,23 +103,24 @@ export function mount(host, opts = {}) {
     contactU.value = 0.40 + (0.22 - 0.40) * t;
     lawnCur.copy(LAWN_DARK).lerp(LAWN_LIGHT, t);
   }
-  function sampleStage() {
-    const raw = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
-    if (raw) bgCur.set(raw);
-    else bgCur.copy(themeDark() ? BG_DARK : BG_LIGHT);
+  function paintBackdrop(cssColor) {
+    const raw = cssColor || (themeDark() ? '#121618' : '#eceeee');
+    bgCur.set(raw);
     renderer.setClearColor(bgCur, 1);
     scene.fog.color.copy(bgCur);
-    canvas.style.backgroundColor = raw || (themeDark() ? '#121618' : '#eceeee');
+    scene.background = bgCur;
+    canvas.style.backgroundColor = raw;
     applySceneTheme();
+    draw();
+  }
+  function sampleStage() {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    paintBackdrop(raw || (themeDark() ? '#121618' : '#eceeee'));
   }
   function syncTheme() {
     sampleStage();
     themeUntil = performance.now() + 1200;
-    draw();
   }
-  sampleStage();
-  const themeObs = new MutationObserver(syncTheme);
-  themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   let composer = null, fxaaPass = null;
   if (!msaa) {
     composer = new EffectComposer(renderer);
@@ -121,6 +134,10 @@ export function mount(host, opts = {}) {
     if (composer) composer.render();
     else renderer.render(scene, camera);
   }
+  sampleStage();
+  canvas.style.colorScheme = themeDark() ? 'only dark' : 'only light';
+  const themeObs = new MutationObserver(syncTheme);
+  themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   const pivot = new THREE.Group();
   scene.add(pivot);
   let root = new THREE.Group();
@@ -273,7 +290,8 @@ export function mount(host, opts = {}) {
     const lawn = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), lawnMat);
     lawn.rotation.x = -Math.PI / 2;
     lawn.position.set(cx, -0.03, cz);
-    lawn.scale.set(lawnW * 0.88, lawnD * 0.88, 1);
+    const lawnFit = 0.74;
+    lawn.scale.set(lawnW * lawnFit, lawnD * lawnFit, 1);
     lawn.renderOrder = -2;
     lawn.castShadow = false;
     lawn.receiveShadow = false;
@@ -300,8 +318,8 @@ export function mount(host, opts = {}) {
       root.add(box(0.62, 0.56, 0.05, revealMat, wx, wy, wz));
       root.add(box(0.52, 0.46, 0.045, M(C.frame, { roughness: 0.9, flatShading: false }), wx, wy, wz + out * 0.02));
       root.add(box(0.4, 0.34, 0.03, M(C.glassDirty, { roughness: 0.2, metalness: 0.04, flatShading: false }), wx, wy, wz + out * 0.04));
-      root.add(box(0.03, 0.34, 0.02, M(C.frame, { roughness: 0.86 }), wx, wy, wz + out * 0.05));
-      root.add(box(0.4, 0.03, 0.02, M(C.frame, { roughness: 0.86 }), wx, wy, wz + out * 0.05));
+      root.add(box(0.07, 0.34, 0.03, M(C.frame, { roughness: 0.86 }), wx, wy, wz + out * 0.05));
+      root.add(box(0.4, 0.07, 0.03, M(C.frame, { roughness: 0.86 }), wx, wy, wz + out * 0.05));
     };
     const decorSide = (sx, sy, sz, out) => {
       root.add(box(0.05, 0.48, 0.5, revealMat, sx, sy, sz));
@@ -398,8 +416,8 @@ export function mount(host, opts = {}) {
       pwin.g.add(box(0.68, 0.64, 0.05, revealMat, wx, wy, wz));
       pwin.g.add(box(0.58, 0.54, 0.05, frameMat, wx, wy, wz + out * 0.02));
       pwin.g.add(box(0.46, 0.42, 0.03, glassMat, wx, wy, wz + out * 0.04));
-      pwin.g.add(box(0.035, 0.42, 0.02, frameMat, wx, wy, wz + out * 0.05));
-      pwin.g.add(box(0.46, 0.035, 0.02, frameMat, wx, wy, wz + out * 0.05));
+      pwin.g.add(box(0.07, 0.42, 0.03, frameMat, wx, wy, wz + out * 0.05));
+      pwin.g.add(box(0.46, 0.07, 0.03, frameMat, wx, wy, wz + out * 0.05));
       pwin.g.add(box(0.76, 0.05, 0.08, frameMat, wx, wy - 0.36, wz + out * 0.02));
     };
     for (let f = 0; f < s.floors; f++) {
@@ -419,8 +437,8 @@ export function mount(host, opts = {}) {
         const wy = f * FH + 0.55;
         pwin.g.add(box(0.05, 0.5, 0.52, revealMat, sx, wy, z));
         pwin.g.add(box(0.04, 0.4, 0.4, frameMat, sx + sign * 0.02, wy, z));
-        pwin.g.add(box(0.025, 0.3, 0.3, glassMat, sx + sign * 0.035, wy, z));
-        pwin.g.add(box(0.02, 0.3, 0.03, frameMat, sx + sign * 0.045, wy, z));
+        pwin.g.add(box(0.04, 0.3, 0.3, glassMat, sx + sign * 0.04, wy, z));
+        pwin.g.add(box(0.055, 0.3, 0.06, frameMat, sx + sign * 0.055, wy, z));
       }
     };
     if (s.neigh !== 'left' && s.neigh !== 'both') { sideWin(-1, -0.35); sideWin(-1, 0.35); }
@@ -431,8 +449,8 @@ export function mount(host, opts = {}) {
       const gableLight = sign => {
         const sx = x0 + sign * ((W + 0.3) / 2 + 0.03);
         pwin.g.add(box(0.05, 0.32, 0.38, revealMat, sx, H + 0.28, 0));
-        pwin.g.add(box(0.035, 0.22, 0.26, frameMat, sx + sign * 0.02, H + 0.28, 0));
-        pwin.g.add(box(0.02, 0.16, 0.18, glassMat, sx + sign * 0.035, H + 0.28, 0));
+        pwin.g.add(box(0.05, 0.22, 0.26, frameMat, sx + sign * 0.03, H + 0.28, 0));
+        pwin.g.add(box(0.05, 0.16, 0.18, glassMat, sx + sign * 0.05, H + 0.28, 0));
       };
       // Hip roofs have no gable face. A shared wall buries the end it covers.
       if (s.neigh && s.neigh !== 'left' && s.neigh !== 'both') gableLight(-1);
@@ -523,6 +541,7 @@ export function mount(host, opts = {}) {
       arr.position.set(x0 - (s.neigh ? 0 : RW * 0.08), sy + ny * lift, sz + nz * lift);
     }
     ps.g.add(arr);
+    ps.grow = arr;
     arr.children.filter(c => c.userData.local).forEach(d => { d.userData.mode = 'fade'; d.userData.o0 = d.material.opacity; d.userData.p0 = d.position.clone(); d.userData.s0 = d.scale.clone(); ps.dirt.push(d); });
 
     // Gutters run around the eaves, with a downpipe at each open corner.
@@ -543,7 +562,7 @@ export function mount(host, opts = {}) {
         if (s.neigh !== 'both') pg.g.add(box(gutD, gutH, zE * 2, gutMat, xR, gutY, 0));
       }
       const pipeTop = gutY - gutH / 2, pipeH = Math.max(0.4, pipeTop + 0.02);
-      const pipe = (x, z) => pg.g.add(box(0.06, pipeH, 0.06, gutMat, x, pipeTop - pipeH / 2, z));
+      const pipe = (x, z) => pg.g.add(box(0.1, pipeH, 0.1, gutMat, x, pipeTop - pipeH / 2, z));
       pipe(xL + 0.12, zE - gutD);
       pipe(xL + 0.12, -(zE - gutD));
       if (!s.neigh) { pipe(xR - 0.12, zE - gutD); pipe(xR - 0.12, -(zE - gutD)); }
@@ -566,33 +585,106 @@ export function mount(host, opts = {}) {
       }
     }
 
-    // driveway, patio and path each have their own height. Dirt sits just above its own slab.
+    // One paved surface: driveway, path and patio share a height and a rounded rim,
+    // and the whole plate stays inside the solid part of the lawn.
     const pd = part('driveway');
-    const dw = gw ? gw + 0.15 : 1.15, dx = gw ? gx : x0 + W / 2 - dw / 2 - 0.05, dl = 1.45;
-    const paveMat = paveFade(paveOf(dirtyMat(pd, C.paveDirty, C.pave, { roughness: 0.93 })), dl / 2);
-    const driveTop = slab(pd.g, dw, 0.028, dl, paveMat, dx, front + dl / 2 + 0.05, 0.02, 2);
+    const pp = part('patio');
+    const dw = gw ? gw + 0.15 : 1.15, dx = gw ? gx : x0 + W / 2 - dw / 2 - 0.05;
+    const px = gw || s.neigh ? x0 - W / 2 + 0.75 : x0 - W / 2 - 0.1;
+    const lawnSx = lawnW * lawnFit, lawnSy = lawnD * lawnFit;
+    const onLawn = (x, z) => {
+      const u = (x - cx) / lawnSx, v = (z - cz) / lawnSy;
+      return Math.hypot(u, v) * 2 <= 0.56;
+    };
+    let padL = Math.min(px - 0.62, doorX - 0.34, dx - dw / 2);
+    let padR = Math.max(px + 0.62, doorX + 0.34, dx + dw / 2);
+    let padNear = front + 0.04;
+    let padFar = front + 1.15;
+    for (let n = 0; n < 24 && !onLawn(padL, padFar); n++) padL += 0.04;
+    for (let n = 0; n < 24 && !onLawn(padR, padFar); n++) padR -= 0.04;
+    for (let n = 0; n < 24 && (!onLawn(padL, padFar) || !onLawn(padR, padFar) || !onLawn((padL + padR) / 2, padFar)); n++) padFar -= 0.04;
+    const padW = Math.max(0.8, padR - padL), padD = Math.max(0.45, padFar - padNear);
+    const padCx = (padL + padR) / 2, padCz = (padNear + padFar) / 2;
+    const seam = THREE.MathUtils.clamp(dx - dw / 2, padL + 0.2, padR - 0.2);
+    const paveU = {
+      driveA: { value: col(C.paveDirty) }, driveB: { value: col(C.pave) },
+      patioA: { value: col(C.paveDirty) }, patioB: { value: col(C.pave) },
+      driveK: { value: 0 }, patioK: { value: 0 }, seam: { value: seam },
+    };
+    const paveMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.93, metalness: 0 });
+    paveMat.polygonOffset = true;
+    paveMat.polygonOffsetFactor = -2;
+    paveMat.polygonOffsetUnits = -2;
+    paveMat.customProgramCacheKey = () => 'gleam-pave-plate';
+    paveMat.userData.driveK = paveU.driveK;
+    paveMat.userData.patioK = paveU.patioK;
+    paveMat.onBeforeCompile = shader => {
+      shader.uniforms.uDriveA = paveU.driveA;
+      shader.uniforms.uDriveB = paveU.driveB;
+      shader.uniforms.uPatioA = paveU.patioA;
+      shader.uniforms.uPatioB = paveU.patioB;
+      shader.uniforms.uDriveK = paveU.driveK;
+      shader.uniforms.uPatioK = paveU.patioK;
+      shader.uniforms.uSeam = paveU.seam;
+      shader.vertexShader = 'varying float vPaveX;\n' + shader.vertexShader.replace(
+        '#include <project_vertex>',
+        '#include <project_vertex>\nvPaveX = (modelMatrix * vec4(transformed, 1.0)).x;'
+      );
+      shader.fragmentShader = 'varying float vPaveX;\nuniform vec3 uDriveA;\nuniform vec3 uDriveB;\nuniform vec3 uPatioA;\nuniform vec3 uPatioB;\nuniform float uDriveK;\nuniform float uPatioK;\nuniform float uSeam;\n' + shader.fragmentShader.replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        float side = smoothstep(uSeam - 0.05, uSeam + 0.05, vPaveX);
+        vec3 driveCol = mix(uDriveA, uDriveB, uDriveK);
+        vec3 patioCol = mix(uPatioA, uPatioB, uPatioK);
+        diffuseColor.rgb = mix(patioCol, driveCol, side);`
+      );
+    };
+    pd.mats.push(paveMat);
+    pp.mats.push(paveMat);
+    const rad = Math.min(0.22, padW * 0.18, padD * 0.35);
+    const plateShape = new THREE.Shape();
+    plateShape.moveTo(-padW / 2 + rad, -padD / 2);
+    plateShape.lineTo(padW / 2 - rad, -padD / 2);
+    plateShape.absarc(padW / 2 - rad, -padD / 2 + rad, rad, -Math.PI / 2, 0, false);
+    plateShape.lineTo(padW / 2, padD / 2 - rad);
+    plateShape.absarc(padW / 2 - rad, padD / 2 - rad, rad, 0, Math.PI / 2, false);
+    plateShape.lineTo(-padW / 2 + rad, padD / 2);
+    plateShape.absarc(-padW / 2 + rad, padD / 2 - rad, rad, Math.PI / 2, Math.PI, false);
+    plateShape.lineTo(-padW / 2, -padD / 2 + rad);
+    plateShape.absarc(-padW / 2 + rad, -padD / 2 + rad, rad, Math.PI, Math.PI * 1.5, false);
+    const plateGeo = new THREE.ExtrudeGeometry(plateShape, {
+      depth: 0.01, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.045, bevelSegments: 2, curveSegments: 5,
+    });
+    plateGeo.rotateX(-Math.PI / 2);
+    plateGeo.computeBoundingBox();
+    plateGeo.translate(padCx, -0.012 - plateGeo.boundingBox.max.y, padCz);
+    const plate = new THREE.Mesh(plateGeo, paveMat);
+    plate.castShadow = false;
+    plate.receiveShadow = false;
+    plate.renderOrder = 2;
+    plate.userData.frame = false;
+    root.add(plate);
+    const plateTop = -0.012;
+    const pickMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, toneMapped: false });
+    const pickBox = (parent, w, x) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.2, w), 0.06, padD), pickMat);
+      m.position.set(x, plateTop, padCz);
+      m.castShadow = false;
+      m.receiveShadow = false;
+      parent.add(m);
+    };
+    pickBox(pd.g, padR - seam, (padR + seam) / 2);
+    pickBox(pp.g, seam - padL, (seam + padL) / 2);
     for (let i = 0; i < 6; i++) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(0.1 + r() * 0.16, 8), decalMat(C.grime, 0.45));
-      m.rotation.x = -Math.PI / 2; m.position.set(dx + (r() - 0.5) * (dw - 0.3), driveTop + 0.012, front + 0.25 + r() * (dl * 0.55)); m.scale.set(1, 1 + r(), 1);
+      const m = new THREE.Mesh(new THREE.CircleGeometry(0.08 + r() * 0.12, 8), decalMat(C.grime, 0.45));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(THREE.MathUtils.clamp(dx + (r() - 0.5) * (dw - 0.2), seam + 0.08, padR - 0.12), plateTop + 0.02, padNear + 0.12 + r() * (padD - 0.28));
       grime(pd, m, 'fade');
     }
-
-    const pp = part('patio');
-    const patMat = paveOf(dirtyMat(pp, C.paveDirty, C.pave, { roughness: 0.93 }));
-    const pathLen = 1.05;
-    const pathMat = paveFade(paveOf(dirtyMat(pp, C.paveDirty, C.pave, { roughness: 0.93 })), pathLen / 2);
-    const px = gw || s.neigh ? x0 - W / 2 + 0.75 : x0 - W / 2 - 0.1;
-    const patioTop = slab(pp.g, 1.4, 0.024, 1.3, patMat, px, front + 0.85, 0.012, 1);
-    const pathTop = slab(pp.g, 0.5, 0.02, pathLen, pathMat, doorX, front + pathLen / 2 + 0.02, 0.045, 3);
-    for (let i = 0; i < 4; i++) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(0.08 + r() * 0.14, 7), decalMat(i % 2 ? C.moss : C.grime, 0.45));
-      m.rotation.x = -Math.PI / 2; m.position.set(px + (r() - 0.5) * 1.0, patioTop + 0.016, front + 0.55 + r() * 0.7);
-      grime(pp, m, 'fade');
-    }
-    for (let i = 0; i < 2; i++) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(0.06 + r() * 0.05, 7), decalMat(C.grime, 0.4));
+    for (let i = 0; i < 5; i++) {
+      const m = new THREE.Mesh(new THREE.CircleGeometry(0.07 + r() * 0.1, 7), decalMat(i % 2 ? C.moss : C.grime, 0.45));
       m.rotation.x = -Math.PI / 2;
-      m.position.set(x0 + (s.bays > 2 ? 0 : -W / 4 + 0.1) + (r() - 0.5) * 0.2, pathTop + 0.016, front + 0.35 + r() * 0.5);
+      m.position.set(THREE.MathUtils.clamp(px + (r() - 0.5) * 0.9, padL + 0.12, seam - 0.08), plateTop + 0.02, padNear + 0.16 + r() * (padD - 0.32));
       grime(pp, m, 'fade');
     }
 
@@ -617,12 +709,6 @@ export function mount(host, opts = {}) {
 
     pivot.position.x = -x0 * 0.15;
     const span = Math.max(W + gw, H + 2, Dp);
-    const sds = Math.max(8, span * 0.95);
-    sun.shadow.camera.left = -sds;
-    sun.shadow.camera.right = sds;
-    sun.shadow.camera.top = sds;
-    sun.shadow.camera.bottom = -sds;
-    sun.shadow.camera.updateProjectionMatrix();
     sun.position.set(span * 0.9 + 4, H + 7.5, span * 0.35 + 5);
     fill.position.set(-span - 4, H * 0.85 + 4, -span * 0.2 - 3);
     sun.target.position.set(0, H * 0.35, 0);
@@ -653,7 +739,12 @@ export function mount(host, opts = {}) {
 
   function applyClean(p) {
     const c = p.clean, e = c * c * (3 - 2 * c);
-    p.mats.forEach(m => m.color.copy(m.userData.a).lerp(m.userData.b, e));
+    p.mats.forEach(m => {
+      if (m.userData.driveK && p.id === 'driveway') m.userData.driveK.value = e;
+      else if (m.userData.patioK && p.id === 'patio') m.userData.patioK.value = e;
+      else if (m.userData.a) m.color.copy(m.userData.a).lerp(m.userData.b, e);
+    });
+    if (p.grow) p.grow.scale.setScalar(0.4 + 0.6 * e);
     p.dirt.forEach(d => {
       const u = d.userData;
       if (u.mode === 'fade') d.material.opacity = u.o0 * (1 - e);
@@ -730,16 +821,19 @@ export function mount(host, opts = {}) {
   function ageClean(now) {
     Object.values(parts).forEach(p => {
       if (p.clean === p.target) return;
-      const dur = (p.target ? 1.1 : 0.5) * 1000;
-      const t = Math.min(1, (now - (p.since || now)) / dur);
+      const dur = reduced ? 1 : 520;
+      const t = Math.min(1, (now - p.since) / dur);
       p.clean = p.from + (p.target - p.from) * t;
-      if (t >= 1) p.clean = p.target;
+      if (t >= 1) { p.clean = p.target; p.since = 0; }
       applyClean(p);
     });
   }
 
   // Orbit the camera. Yaw is unbounded. Elevation tilts, clamped like the estimator.
   const VIEW = { az: 0.42, el: 0.37, sway: 0.26, swaySpeed: 0.2, fov: 30 };
+  const phoneLayout = () => (window.innerWidth || host.clientWidth || 1200) < 960;
+  const camFov = () => phoneLayout() ? 16 : VIEW.fov;
+  const viewLimit = () => phoneLayout() ? 0.92 : 0.84;
   const EL_MIN = 0.05, EL_MAX = 0.95;
   let yaw = 0, yawT = 0, velYaw = 0, el = VIEW.el, elT = VIEW.el, velEl = 0;
   let drag = null, lastInput = -1e9, idlePhase = 0, hold = false;
@@ -812,7 +906,8 @@ export function mount(host, opts = {}) {
     const pts = [];
     const corner = new THREE.Vector3();
     root.traverse(o => {
-      if (!o.isMesh || !o.geometry || o.userData.ground) return;
+      if (!o.isMesh || !o.geometry || o.userData.ground || o.userData.frame === false) return;
+      if (o.material && (o.material.transparent || o.material.colorWrite === false)) return;
       const geo = o.geometry;
       if (o.userData.plate) {
         const rad = o.userData.plate;
@@ -863,7 +958,7 @@ export function mount(host, opts = {}) {
   let fitKey = '';
   let fitDist = 14;
   function sphereDist() {
-    const half = THREE.MathUtils.degToRad(VIEW.fov / 2);
+    const half = THREE.MathUtils.degToRad(camFov() / 2);
     const tanV = Math.tan(half);
     const tanH = tanV * Math.max(0.4, camera.aspect || 1.4);
     const ang = Math.atan(Math.min(tanV, tanH) * 0.96);
@@ -871,11 +966,12 @@ export function mount(host, opts = {}) {
   }
   function targetDist() {
     if (!sphere) return 14;
-    const key = (camera.aspect || 1).toFixed(3) + ':' + sphere.r.toFixed(3) + ':' + sphere.cx.toFixed(2) + ':' + sphere.cz.toFixed(2);
+    const limit = viewLimit();
+    const key = (camera.aspect || 1).toFixed(3) + ':' + sphere.r.toFixed(3) + ':' + sphere.cx.toFixed(2) + ':' + sphere.cz.toFixed(2) + ':' + limit + ':' + camFov();
     if (key === fitKey) return fitDist;
     const upper = sphereDist();
     const savedYaw = yaw, savedEl = el;
-    const yaws = [0, Math.PI / 5, Math.PI / 2, Math.PI, Math.PI * 1.25, Math.PI * 1.5, Math.PI * 1.75];
+    const yaws = [0.42, 0.42 + Math.PI / 2, 0.42 + Math.PI, 0.42 - Math.PI / 2, Math.PI / 5, Math.PI * 1.25];
     const els = [EL_MIN, VIEW.el, EL_MAX];
     const fits = d => {
       for (const az of yaws) {
@@ -883,7 +979,7 @@ export function mount(host, opts = {}) {
           yaw = VIEW.az - az;
           el = e;
           applyCamera(d);
-          const cov = projectSpan(0.84);
+          const cov = projectSpan(limit);
           if (!cov || cov.outside) return false;
         }
       }
@@ -922,7 +1018,7 @@ export function mount(host, opts = {}) {
     const near = Math.max(0.08, (d - sphere.r) * 0.45);
     camera.near = Math.min(near, Math.max(0.08, d * 0.25));
     camera.far = d + sphere.r * 3.2;
-    camera.fov = VIEW.fov;
+    camera.fov = camFov();
     camera.updateMatrixWorld(true);
     camera.updateProjectionMatrix();
   }
@@ -930,16 +1026,18 @@ export function mount(host, opts = {}) {
     const pts = framePts;
     if (!pts || pts.length < 3) return null;
     pivot.updateWorldMatrix(true, true);
-    let maxX = 0, maxY = 0, outside = false;
+    let maxX = 0, maxY = 0, minX = 0, minY = 0, outside = false;
     const corner = new THREE.Vector3();
     for (let p = 0; p < pts.length; p += 3) {
       corner.set(pts[p], pts[p + 1], pts[p + 2]).applyMatrix4(pivot.matrixWorld).project(camera);
+      if (corner.x < minX) minX = corner.x;
+      if (corner.x > maxX) maxX = corner.x;
+      if (corner.y < minY) minY = corner.y;
+      if (corner.y > maxY) maxY = corner.y;
       const ax = Math.abs(corner.x), ay = Math.abs(corner.y);
-      if (ax > maxX) maxX = ax;
-      if (ay > maxY) maxY = ay;
       if (ax > limit || ay > limit || corner.z < -1 || corner.z > 1) outside = true;
     }
-    return { maxX, maxY, outside };
+    return { maxX: Math.max(Math.abs(minX), maxX), maxY: Math.max(Math.abs(minY), maxY), minX, minY, hiX: maxX, hiY: maxY, outside };
   }
   function frameHouse() {
     const td = targetDist();
@@ -953,17 +1051,18 @@ export function mount(host, opts = {}) {
     // The stage column is narrower than the window, so desktop has to be
     // detected from the viewport. A taller canvas keeps the house from sitting
     // in a short wide strip.
-    const wide = (window.innerWidth || w) >= 960;
-    const cap = wide ? w / 1.12 : w / 1.48;
-    const vh = (window.innerHeight || 700) * (wide ? 0.74 : 0.38);
-    const h = Math.round(Math.min(cap, vh));
+    const wide = !phoneLayout();
+    const vh = window.innerHeight || 700;
+    // Phone: a taller stage narrows the horizontal view so the front of the
+    // house can fill the width without the top-down orbit leaving the frame.
+    const h = Math.round(wide ? Math.min(w / 1.12, vh * 0.74) : Math.min(w / 1.02, vh * 0.5));
     // A language switch can notify the observer without changing the drawing size.
     // Skip that so the camera is not framed again. A real rebuild still reframes.
     if (fromObserver && (!host.clientWidth || (w === viewW && h === viewH))) return;
     viewW = w;
     viewH = h;
     canvas.style.height = h + 'px';
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap));
+    renderer.setPixelRatio(pixelScale());
     renderer.setSize(w, h, false);
     if (composer) {
       composer.setPixelRatio(renderer.getPixelRatio());
@@ -1046,19 +1145,36 @@ export function mount(host, opts = {}) {
       const p = parts[id]; if (!p) return null;
       pivot.updateMatrixWorld(true);
       const b = canvas.getBoundingClientRect();
-      // sample points on the part until one picks back to the same id
+      // Prefer a spot in the middle of the part, with the canvas on top,
+      // so a tap does not land on a one-pixel edge or on the caption.
       const meshes = []; p.g.traverse(o => { if (o.isMesh && o.visible && !(o.material && o.material.transparent)) meshes.push(o); });
+      let best = null, bestScore = -1;
+      const scoreAt = (x, y) => {
+        if (pick(x, y) !== id) return -1;
+        const top = document.elementFromPoint(x, y);
+        if (top !== canvas) return -1;
+        let score = 0;
+        for (const d of [6, 12]) {
+          if (pick(x + d, y) === id) score++;
+          if (pick(x - d, y) === id) score++;
+          if (pick(x, y + d) === id) score++;
+          if (pick(x, y - d) === id) score++;
+        }
+        return score;
+      };
       for (const m of meshes) {
         const bb = new THREE.Box3().setFromObject(m);
-        const fr = [0.5, 0.2, 0.8, 0.35, 0.65, 0.1, 0.9];
-        for (const fx of fr) for (const fy of fr) for (const fz of [0.5, 0, 1, 0.25, 0.75]) {
+        const fr = [0.5, 0.35, 0.65, 0.2, 0.8, 0.1, 0.9];
+        for (const fx of fr) for (const fy of fr) for (const fz of [0.5, 0.25, 0.75, 0, 1]) {
           const c = new THREE.Vector3(bb.min.x + (bb.max.x - bb.min.x) * fx, bb.min.y + (bb.max.y - bb.min.y) * fy, bb.min.z + (bb.max.z - bb.min.z) * fz);
           c.project(camera);
           const x = b.left + (c.x + 1) / 2 * b.width, y = b.top + (1 - c.y) / 2 * b.height;
-          if (x > b.left + 2 && x < b.right - 2 && y > b.top + 2 && y < b.bottom - 2 && pick(x, y) === id) return { x, y };
+          if (x <= b.left + 8 || x >= b.right - 8 || y <= b.top + 8 || y >= b.bottom - 8) continue;
+          const score = scoreAt(x, y);
+          if (score > bestScore) { bestScore = score; best = { x, y }; }
         }
       }
-      return null;
+      return best;
     },
     parts: () => Object.keys(parts),
     setYaw(y) {
@@ -1075,8 +1191,10 @@ export function mount(host, opts = {}) {
     },
     view() { return { az: VIEW.az - yaw, el, dist }; },
     coverage() { return projectSpan(0.92); },
+    settleFps() { frames.length = 0; },
     msaa: () => msaa,
     pixelRatio: () => renderer.getPixelRatio(),
+    paintBackdrop,
     contextAttributes() {
       const a = gl.getContextAttributes() || {};
       return {

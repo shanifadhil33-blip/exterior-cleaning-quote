@@ -27,6 +27,7 @@
   } catch (e2) {}
 })();
 </script>
+<style id="bootPaint">html,body{background:#ECEEEE;color:#1D2125}html[data-theme="dark"],html[data-theme="dark"] body{background:#121618;color:#F4F6F7}</style>
 <title>Gleam | Instant exterior cleaning quote</title>
 <meta name="description" content="Build your exterior cleaning quote on your own home and book it by text or WhatsApp.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231D2125'/%3E%3Cpath d='M6 23l7.5-12 4.2 6.4 2.8-3.8L26 23' fill='none' stroke='%23F9FAFA' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
@@ -115,7 +116,6 @@
   --h-cell:rgba(255,255,255,.22);
 }
 html[data-theme="dark"]{
-  color-scheme: only dark;
   --bg:#121618;
   --surface:#1C2126;
   --sel:#262C31;
@@ -281,6 +281,9 @@ button{cursor:pointer;touch-action:manipulation}
 .chk svg{opacity:0;transform:scale(.5);transition:opacity .25s,transform .35s var(--ease)}
 .svc.on .chk{background:var(--ink);border-color:var(--ink)}
 .svc.on .chk svg{opacity:1;transform:none}
+@media (max-width:959px){
+  .svc-main,.seg button,.day,.chip,#sumBtn,#locBtn,.svc{scroll-margin-top:min(470px,58vh);scroll-margin-bottom:110px}
+}
 .opt-wrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s var(--ease)}
 .svc.on .opt-wrap{grid-template-rows:1fr}
 .opt-in{overflow:hidden;min-height:0}
@@ -451,12 +454,11 @@ html[data-theme="dark"] .theme .moon{opacity:1;transform:none}
 [dir="rtl"] .h2,[dir="rtl"] .bar-amt,[dir="rtl"] .stage-est strong{letter-spacing:0}
 /* 3D house */
 .stage{position:relative}
-.gl3{position:relative;width:100%;display:block;touch-action:pan-y;outline:none;cursor:grab;background-color:#ECEEEE;background-color:var(--bg);color-scheme:only light;opacity:0}
-html[data-theme="dark"] .gl3{color-scheme:only light}
+.gl3{position:absolute;left:0;right:0;top:0;width:100%;display:block;touch-action:pan-y;outline:none;cursor:grab;background-color:#ECEEEE;background-color:var(--bg);opacity:0;pointer-events:none}
 .gl3:active{cursor:grabbing}
-.stage.gl-on .house{display:none}
-.stage.gl-on .gl3{animation:glIn .6s var(--ease) both}
-@keyframes glIn{from{opacity:0}to{opacity:1}}
+.stage.gl-on .house{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;pointer-events:none}
+.stage.gl-on .gl3{position:relative;pointer-events:auto}
+.stage.gl-show .gl3{opacity:1}
 </style>
 </head>
 <body>
@@ -1227,6 +1229,28 @@ function load3d() {
     H3.build(spec3d());
     stage.classList.add('gl-on');
     window.__h3d = H3;
+    // The first presented WebGL frame is a long GPU hitch. Hold the canvas
+    // almost invisible through that, then fade it in over 300ms.
+    const canvas = H3.canvas;
+    const dur = reduced ? 1 : 300;
+    canvas.style.opacity = '0.001';
+    let warm = 3;
+    const start = () => {
+      if (warm-- > 0) { requestAnimationFrame(start); return; }
+      const t0 = performance.now();
+      const step = now => {
+        const u = Math.min(1, (now - t0) / dur);
+        canvas.style.opacity = String(0.001 + 0.999 * u);
+        if (u < 1) requestAnimationFrame(step);
+        else {
+          stage.classList.add('gl-show');
+          canvas.style.opacity = '';
+          if (H3.settleFps) H3.settleFps();
+        }
+      };
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(start);
   }).catch(err => { H3 = null; window.__h3dError = String(err && err.message || err); });
 }
 function renderHouse(animate) {
@@ -1978,41 +2002,92 @@ function syncThemeButton() {
   themeBtn.setAttribute('aria-pressed', dark ? 'true' : 'false');
   themeBtn.setAttribute('aria-label', tr(dark ? 'Switch to light theme' : 'Switch to dark theme'));
 }
+function themeLum(c) { return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+function themeContrast(ink, bg) {
+  const lin = c => c.map(v => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+  const L = c => { const ch = lin(c); return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]; };
+  const a = L(ink), b = L(bg);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
 function setTheme(theme) {
   const dark = theme === 'dark';
   const toKey = dark ? 'dark' : 'light';
   const root = document.documentElement;
-  const from = readTheme(root);
+  const fromKey = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const read = readTheme(root);
+  const readable = read['--bg'] && read['--ink'] && themeContrast(read['--ink'], read['--bg']) > 2;
+  const from = readable ? read : THEME_PARSED[fromKey];
   const to = THEME_PARSED[toKey];
-  // Pin the colours that are on screen before the attribute change, so the first frame cannot jump.
+  const inkNames = ['--ink', '--ink-2', '--muted', '--faint', '--on-ink'];
+  // Keep the stylesheet on the current theme until the lerp ends, so a
+  // data-theme flip cannot paint destination text on the old background.
   writeTheme(root, from);
-  root.setAttribute('data-theme', toKey);
-  root.style.colorScheme = dark ? 'only dark' : 'only light';
-  const scheme = document.getElementById('colorSchemeMeta');
-  if (scheme) scheme.setAttribute('content', dark ? 'only dark' : 'only light');
-  const supported = document.getElementById('supportedSchemeMeta');
-  if (supported) supported.setAttribute('content', dark ? 'dark' : 'light');
-  const color = document.getElementById('themeColorMeta');
-  if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
+  root.style.backgroundColor = fmtCssColor(from['--bg']);
+  if (document.body) document.body.style.backgroundColor = fmtCssColor(from['--bg']);
   try { localStorage.setItem('gleam.theme', toKey); } catch (_) { /* ignore */ }
-  syncThemeButton();
-  if (H3 && H3.syncTheme) H3.syncTheme();
+  themeBtn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+  themeBtn.setAttribute('aria-label', tr(dark ? 'Switch to light theme' : 'Switch to dark theme'));
+  const paint = cols => {
+    const bg = fmtCssColor(cols['--bg']);
+    const ink = fmtCssColor(cols['--ink']);
+    // Inline colour beats the boot stylesheet, which otherwise keeps the
+    // dark-theme heading colour for the whole return to light.
+    root.style.backgroundColor = bg;
+    root.style.color = ink;
+    if (document.body) {
+      document.body.style.backgroundColor = bg;
+      document.body.style.color = ink;
+    }
+    if (H3 && H3.paintBackdrop) H3.paintBackdrop(bg);
+    else if (H3 && H3.syncTheme) H3.syncTheme();
+  };
+  paint(from);
   const t0 = performance.now();
   cancelAnimationFrame(themeRAF);
+  const finish = () => {
+    const finalBg = THEME_VALUES[toKey]['--bg'];
+    writeTheme(root, to);
+    root.setAttribute('data-theme', toKey);
+    for (const v of THEME_VARS) root.style.removeProperty(v);
+    root.style.removeProperty('background-color');
+    root.style.removeProperty('color');
+    if (document.body) {
+      document.body.style.removeProperty('background-color');
+      document.body.style.removeProperty('color');
+    }
+    root.style.colorScheme = dark ? 'only dark' : 'only light';
+    const scheme = document.getElementById('colorSchemeMeta');
+    if (scheme) scheme.setAttribute('content', dark ? 'only dark' : 'only light');
+    const supported = document.getElementById('supportedSchemeMeta');
+    if (supported) supported.setAttribute('content', dark ? 'dark' : 'light');
+    const color = document.getElementById('themeColorMeta');
+    if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
+    const canvas = document.querySelector('canvas.gl3');
+    if (canvas) canvas.style.colorScheme = dark ? 'only dark' : 'only light';
+    syncThemeButton();
+    if (H3 && H3.paintBackdrop) H3.paintBackdrop(finalBg);
+    themeRAF = 0;
+    requestAnimationFrame(() => { if (H3 && H3.paintBackdrop) H3.paintBackdrop(finalBg); });
+  };
   const step = now => {
     const u = easeTheme((now - t0) / 450);
-    if (u >= 1) {
-      for (const v of THEME_VARS) root.style.removeProperty(v);
-    } else {
-      const cur = {};
-      for (const v of THEME_VARS) {
+    if (u >= 1) { finish(); return; }
+    const cur = {};
+    const bg = from['--bg'].map((v, i) => v + (to['--bg'][i] - v) * u);
+    const cTo = themeContrast(to['--ink'], bg);
+    const cFrom = themeContrast(from['--ink'], bg);
+    const useTo = cTo >= cFrom && cTo >= 3;
+    for (const v of THEME_VARS) {
+      if (inkNames.includes(v)) cur[v] = (useTo ? to : from)[v];
+      else {
         const a = from[v], b = to[v];
         cur[v] = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u];
       }
-      writeTheme(root, cur);
-      themeRAF = requestAnimationFrame(step);
     }
-    if (H3 && H3.syncTheme) H3.syncTheme();
+    cur['--bg'] = bg;
+    writeTheme(root, cur);
+    paint(cur);
+    themeRAF = requestAnimationFrame(step);
   };
   themeRAF = requestAnimationFrame(step);
 }
