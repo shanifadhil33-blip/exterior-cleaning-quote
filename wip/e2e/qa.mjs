@@ -250,7 +250,7 @@ ok(/color-scheme:\s*only light/.test(src) && /color-scheme:\s*only dark/.test(sr
 ok(src.indexOf("localStorage.getItem('gleam.theme')") < src.indexOf('<style>'), 'owner: saved theme is applied before first paint');
 ok(/id="themeBtn"/.test(src) && /gleam\.theme/.test(src), 'owner: theme toggle is remembered');
 ok(/background-color:#ECEEEE/.test(src) && /background-color:#F9FAFA/.test(src) && /background-color:#E2E6E7/.test(src), 'owner: explicit light backgrounds');
-ok(/0xe2e6e7/.test(houseSrc) && /0x0e1215/.test(houseSrc) && /NeutralToneMapping/.test(houseSrc) && /HemisphereLight/.test(houseSrc), 'owner: house stays lit in both themes');
+ok(/0xe2e6e7/.test(houseSrc) && /0x313940/.test(houseSrc) && /NeutralToneMapping/.test(houseSrc) && /HemisphereLight/.test(houseSrc), 'owner: house stays lit in both themes');
 
 // Light and dark emulation must render the same bright page.
 const { PNG } = await import('pngjs');
@@ -410,7 +410,7 @@ for (const mk of MARKETS) {
     ok(text && body && contrast(text, body) >= 7, `${tag} text contrast`);
     ok(muted && body && contrast(muted, body) >= 4.5, `${tag} muted contrast`);
     ok(input && input.every(c => c < 55), `${tag} input surface ${dark.input}`);
-    ok(canvas && canvas.every(c => c < 40), `${tag} house stage ${dark.canvas}`);
+    ok(canvas && canvas.every(c => c < 72), `${tag} house stage ${dark.canvas}`);
     ok(dark.house, `${tag} 3D house still mounted`);
     ok(dark.sw <= dark.w, `${tag} sideways scroll ${dark.sw}>${dark.w}`);
     const gap = Math.min(Math.abs(dark.themeBox.left - dark.regionBox.right), Math.abs(dark.regionBox.left - dark.themeBox.right));

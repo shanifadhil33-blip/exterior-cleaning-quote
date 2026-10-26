@@ -20,14 +20,32 @@
   if (supported) supported.setAttribute('content', dark ? 'dark' : 'light');
   var color = document.getElementById('themeColorMeta');
   if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
+  if (/\/sa\/?$/.test(location.pathname)) root.classList.add('has-ar');
+  try {
+    var langAr = localStorage.getItem('gleam.lang') === 'ar' || /(?:^|[?&])lang=ar(?:&|$)/.test(location.search);
+    if (langAr && /\/sa\/?$/.test(location.pathname)) root.classList.add('lang-out');
+  } catch (e2) {}
 })();
 </script>
 <title>Gleam | Instant exterior cleaning quote</title>
 <meta name="description" content="Build your exterior cleaning quote on your own home and book it by text or WhatsApp.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231D2125'/%3E%3Cpath d='M6 23l7.5-12 4.2 6.4 2.8-3.8L26 23' fill='none' stroke='%23F9FAFA' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" } }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..800&display=swap">
+<script>
+if (/\/sa\/?$/.test(location.pathname)) {
+  [400, 500, 600, 700].forEach(function (w) {
+    var l = document.createElement('link');
+    l.rel = 'preload'; l.as = 'font'; l.type = 'font/woff2'; l.crossOrigin = 'anonymous';
+    l.href = '/fonts/ibm-plex-sans-arabic-' + w + '.woff2';
+    document.head.appendChild(l);
+  });
+}
+</script>
 <style>
 @property --bg { syntax: "<color>"; inherits: true; initial-value: #ECEEEE; }
 @property --surface { syntax: "<color>"; inherits: true; initial-value: #F9FAFA; }
@@ -40,6 +58,10 @@
 @property --thumb { syntax: "<color>"; inherits: true; initial-value: #F9FAFA; }
 @property --on-ink { syntax: "<color>"; inherits: true; initial-value: #F9FAFA; }
 @property --stage { syntax: "<color>"; inherits: true; initial-value: #E2E6E7; }
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:400;font-display:optional;src:url("/fonts/ibm-plex-sans-arabic-400.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:500;font-display:optional;src:url("/fonts/ibm-plex-sans-arabic-500.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:600;font-display:optional;src:url("/fonts/ibm-plex-sans-arabic-600.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
+@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:700;font-display:optional;src:url("/fonts/ibm-plex-sans-arabic-700.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
 :root{
   color-scheme: only light;
   --sans:"Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -101,11 +123,15 @@ html[data-theme="dark"]{
   --thumb:#343B40;
   --on-ink:#121618;
   --ring:rgba(244,246,247,.20);
-  --stage:#0E1215;
+  --stage:#313940;
 }
-html.theme-ready{
-  transition:--bg .45s var(--ease),--surface .45s var(--ease),--sel .45s var(--ease),--ink .45s var(--ease),--ink-2 .45s var(--ease),--muted .45s var(--ease),--faint .45s var(--ease),--well .45s var(--ease),--thumb .45s var(--ease),--on-ink .45s var(--ease),--stage .45s var(--ease),background-color .45s var(--ease),color .45s var(--ease);
-}
+.top,.hero,.stage-foot,.block,.foot{transition:opacity .18s ease}
+html.lang-out .top:not(.lang-ghost),html.lang-out .hero:not(.lang-ghost),html.lang-out .stage-foot:not(.lang-ghost),html.lang-out .block:not(.lang-ghost),html.lang-out .foot:not(.lang-ghost),html.lang-out .bar:not(.lang-ghost){opacity:0}
+html.lang-swap:not(.lang-in) .top:not(.lang-ghost),html.lang-swap:not(.lang-in) .hero:not(.lang-ghost),html.lang-swap:not(.lang-in) .stage-foot:not(.lang-ghost),html.lang-swap:not(.lang-in) .right:not(.lang-ghost),html.lang-swap:not(.lang-in) .left > .block:not(.lang-ghost),html.lang-swap:not(.lang-in) .foot:not(.lang-ghost),html.lang-swap:not(.lang-in) .bar:not(.lang-ghost){opacity:0;transition:none}
+html.lang-in .top:not(.lang-ghost),html.lang-in .hero:not(.lang-ghost),html.lang-in .stage-foot:not(.lang-ghost),html.lang-in .right:not(.lang-ghost),html.lang-in .left > .block:not(.lang-ghost),html.lang-in .foot:not(.lang-ghost),html.lang-in .bar:not(.lang-ghost){opacity:1;transition:opacity .24s ease}
+.lang-ghost{pointer-events:none}
+#langSw button[data-lang="ar"]{font-family:"IBM Plex Sans Arabic",var(--sans)}
+html:not(.ar-font) #langSw button[data-lang="ar"]{visibility:hidden}
 
 *,*::before,*::after{box-sizing:border-box}
 html{color-scheme:only light;background-color:#ECEEEE;background-color:var(--bg);color:#1D2125;color:var(--ink);-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
@@ -143,9 +169,9 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .stage-wrap.away{transform:translateY(calc(-100% - 24px));opacity:0;pointer-events:none}
 .stage{background:var(--stage);border-radius:32px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line),0 26px 40px -32px rgba(29,33,37,.5)}
 .house{display:block;width:100%;height:auto;max-height:38vh;max-height:38svh;margin:0 auto;padding-top:8px;overflow:visible;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-.stage-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px 16px;min-height:40px}
-.caption{font-size:14px;font-weight:500;color:var(--ink-2);transition:opacity .16s ease}
-.caption.swap{opacity:0}
+.stage-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px 14px;min-height:44px}
+.caption{font-size:14px;font-weight:500;color:var(--ink-2);transition:opacity .2s ease,transform .2s ease;min-width:0;line-height:1.35;min-height:2.8em;display:flex;align-items:center;transform:translateY(0)}
+.caption.swap{opacity:0;transform:translateY(5px)}
 .stage-est{display:none;align-items:baseline;gap:10px;white-space:nowrap}
 .stage-est>span{font-size:13px;color:var(--muted)}
 .stage-est strong{font-size:22px;font-weight:650;letter-spacing:-.03em;font-variant-numeric:tabular-nums;transition:color .3s}
@@ -330,7 +356,7 @@ html[data-theme="dark"] .tiles img{filter:grayscale(1) invert(1) brightness(.78)
 .foot{margin-top:40px;font-size:13px;color:var(--faint)}
 
 /* sticky bar, phones */
-.bar{position:fixed;left:0;right:0;bottom:0;z-index:40;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--bg);background:color-mix(in srgb,var(--bg) 92%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3);border-top:1px solid var(--line);transform:translateY(110%);transition:transform .55s var(--ease)}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:40;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--bg);background:color-mix(in srgb,var(--bg) 92%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3);border-top:1px solid var(--line);transform:translateY(110%);transition:transform .55s var(--ease),opacity .18s ease}
 .bar.show{transform:none}
 .bar.show.tuck{transform:translateY(110%)}
 .bar-in{display:flex;align-items:center;gap:14px;max-width:640px;margin:0 auto}
@@ -362,6 +388,18 @@ html[data-theme="dark"] .tiles img{filter:grayscale(1) invert(1) brightness(.78)
   .right > .block:first-child{margin-top:0}
   .days{margin:0;padding:2px 0 4px}
   .bar{display:none}
+  /* Keep the house column on the left. RTL still applies inside the text. */
+  [dir="rtl"] .top,
+  [dir="rtl"] .hero,
+  [dir="rtl"] .layout{direction:ltr}
+  [dir="rtl"] .hero h1,
+  [dir="rtl"] .hero p,
+  [dir="rtl"] .stage-foot,
+  [dir="rtl"] .layout .right,
+  [dir="rtl"] .left > .block,
+  [dir="rtl"] .foot{direction:rtl}
+  /* Reserve the taller Arabic headline so the stage does not drop on switch. */
+  html.has-ar .hero h1{min-height:2.45em}
 }
 
 @media (prefers-reduced-motion: reduce){
@@ -398,7 +436,10 @@ html[data-theme="dark"] .theme .moon{opacity:1;transform:none}
 [dir="rtl"] .h2,[dir="rtl"] .bar-amt,[dir="rtl"] .stage-est strong{letter-spacing:0}
 /* 3D house */
 .stage{position:relative}
-.gl3{position:relative;width:100%;display:block;touch-action:pan-y;-webkit-tap-highlight-color:transparent;outline:none;cursor:grab;background-color:#E2E6E7;background-color:var(--stage);color-scheme:only light}
+.gl3{position:relative;width:100%;display:block;touch-action:pan-y;-webkit-tap-highlight-color:transparent;outline:none;cursor:grab;background-color:#E2E6E7;background-color:var(--stage);color-scheme:only light;opacity:0}
+html[data-theme="dark"] .stage{box-shadow:inset 0 0 0 1px rgba(244,246,247,.16), 0 18px 36px -20px rgba(0,0,0,.72)}
+html[data-theme="dark"] .caption{align-self:center;width:fit-content;max-width:100%;padding:6px 12px;border-radius:999px;background:rgba(244,246,247,.10)}
+html[data-theme="dark"] .gl3{color-scheme:only light}
 .gl3:active{cursor:grabbing}
 .stage.gl-on .house{display:none}
 .stage.gl-on .gl3{animation:glIn .6s var(--ease) both}
@@ -1090,11 +1131,30 @@ function ripple(e) {
 }
 
 /* ---------- caption ---------- */
-let sayT, swapT;
+let sayT, swapT, swapGen = 0, captionShown = false, langFading = false;
 function setCaption(msg) {
+  if (!captionShown || langFading) {
+    caption.textContent = msg;
+    caption.classList.remove('swap');
+    captionShown = true;
+    clearTimeout(swapT);
+    swapGen++;
+    return;
+  }
+  if (caption.textContent === msg && !caption.classList.contains('swap')) return;
   caption.classList.add('swap');
   clearTimeout(swapT);
-  swapT = setTimeout(() => { caption.textContent = msg; caption.classList.remove('swap'); }, 150);
+  const token = ++swapGen;
+  swapT = setTimeout(() => {
+    if (token !== swapGen) return;
+    caption.textContent = msg;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (token !== swapGen) return;
+        caption.classList.remove('swap');
+      });
+    });
+  }, 200);
 }
 function say(msg) {
   setCaption(msg);
@@ -1120,13 +1180,17 @@ function renderTimes() {
     TIMES.map(([k, l]) => `<button type="button" data-time="${k}" aria-pressed="false">${tr(l)}</button>`).join('');
 }
 function setSeg(el, idx) {
-  const n = el.querySelectorAll('button').length;
+  if (!el) return;
+  const buttons = el.querySelectorAll('button');
+  const thumb = el.querySelector('.seg-thumb');
+  const n = buttons.length;
+  if (!n || !thumb) return;
   const wide = matchMedia('(min-width:520px)').matches;
   const cols = n === 4 ? (wide ? 4 : 2) : n > 4 ? 3 : n, rows = Math.ceil(n / cols);
   el.style.setProperty('--cols', cols); el.style.setProperty('--rows', rows);
   const dir = document.documentElement.dir === 'rtl' ? -1 : 1;
-  el.querySelector('.seg-thumb').style.transform = `translate(${dir * (idx % cols) * 100}%, ${Math.floor(idx / cols) * 100}%)`;
-  el.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', i === idx));
+  thumb.style.transform = `translate(${dir * (idx % cols) * 100}%, ${Math.floor(idx / cols) * 100}%)`;
+  buttons.forEach((b, i) => b.setAttribute('aria-pressed', i === idx));
 }
 const optsWrap = inner => `<div class="opt-wrap"><div class="opt-in"><div class="opts" role="group">${inner}</div></div></div>`;
 function optsFor(id) {
@@ -1563,7 +1627,138 @@ function pickLang() {
   const langs = R().langs || ['en'];
   if (!state.langPicked || !langs.includes(state.lang)) state.lang = langs[0];
 }
-function applyLang() {
+let arabicLoad = null, langGen = 0, themeRAF = 0;
+const THEME_VARS = ['--bg', '--surface', '--sel', '--ink', '--ink-2', '--muted', '--faint', '--well', '--thumb', '--on-ink', '--stage', '--line', '--line-2', '--ring'];
+const THEME_VALUES = {
+  light: { '--bg': '#ECEEEE', '--surface': '#F9FAFA', '--sel': '#F1F3F4', '--ink': '#1D2125', '--ink-2': '#3A4146', '--muted': '#6F767B', '--faint': '#A3AAAE', '--well': '#E1E4E5', '--thumb': '#F9FAFA', '--on-ink': '#F9FAFA', '--stage': '#E2E6E7', '--line': 'rgba(29,33,37,.10)', '--line-2': 'rgba(29,33,37,.18)', '--ring': 'rgba(29,33,37,.14)' },
+  dark: { '--bg': '#121618', '--surface': '#1C2126', '--sel': '#262C31', '--ink': '#F4F6F7', '--ink-2': '#D7DCDE', '--muted': '#B7BFC2', '--faint': '#8E979C', '--well': '#262C31', '--thumb': '#343B40', '--on-ink': '#121618', '--stage': '#313940', '--line': 'rgba(244,246,247,.10)', '--line-2': 'rgba(244,246,247,.18)', '--ring': 'rgba(244,246,247,.20)' }
+};
+function parseCssColor(str) {
+  const s = String(str || '').trim();
+  let m = s.match(/^#([\da-f]{6})$/i);
+  if (m) return [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16), 1];
+  m = s.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)/i);
+  if (!m) return [128, 128, 128, 1];
+  const a = m[4] === undefined ? 1 : (/%$/.test(m[4]) ? parseFloat(m[4]) / 100 : parseFloat(m[4]));
+  return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]), a];
+}
+function fmtCssColor(c) {
+  const r = Math.round(c[0]), g = Math.round(c[1]), b = Math.round(c[2]);
+  if (c[3] >= 0.999) return `rgb(${r}, ${g}, ${b})`;
+  return `rgba(${r}, ${g}, ${b}, ${Math.round(c[3] * 1000) / 1000})`;
+}
+const THEME_PARSED = { light: {}, dark: {} };
+for (const name of ['light', 'dark']) for (const v of THEME_VARS) THEME_PARSED[name][v] = parseCssColor(THEME_VALUES[name][v]);
+function readTheme(root) {
+  const cs = getComputedStyle(root), out = {};
+  for (const v of THEME_VARS) out[v] = parseCssColor(cs.getPropertyValue(v));
+  return out;
+}
+function writeTheme(root, cols) {
+  for (const v of THEME_VARS) root.style.setProperty(v, fmtCssColor(cols[v]));
+}
+function easeTheme(t) {
+  const x = t < 0 ? 0 : t > 1 ? 1 : t;
+  return x * x * (3 - 2 * x);
+}
+function arabicFace(w) { return w + ' 16px "IBM Plex Sans Arabic"'; }
+function arabicReady() {
+  return !!(document.fonts && [400, 500, 600, 700].every(w => document.fonts.check(arabicFace(w))));
+}
+function markArabicFont() {
+  if (arabicReady()) document.documentElement.classList.add('ar-font');
+}
+function ensureArabicFont() {
+  markArabicFont();
+  if (document.documentElement.classList.contains('ar-font')) return Promise.resolve();
+  if (!document.fonts) return Promise.resolve();
+  if (!arabicLoad) {
+    arabicLoad = Promise.all([400, 500, 600, 700].map(w => document.fonts.load(arabicFace(w)))).then(markArabicFont).catch(() => {});
+  }
+  return arabicLoad;
+}
+function settleLang() {
+  if (!document.documentElement.classList.contains('lang-out')) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('lang-out')));
+}
+let langGhosts = [];
+const LANG_FREEZE = ['direction', 'font-family', 'font-weight', 'font-size', 'letter-spacing', 'line-height', 'text-align', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left'];
+function freezePaint(src, dst) {
+  const walk = (a, b) => {
+    const cs = getComputedStyle(a);
+    for (const p of LANG_FREEZE) b.style.setProperty(p, cs.getPropertyValue(p));
+    const ac = a.children, bc = b.children;
+    for (let i = 0; i < ac.length && i < bc.length; i++) walk(ac[i], bc[i]);
+  };
+  walk(src, dst);
+  const fields = src.querySelectorAll('input, textarea, select');
+  const copies = dst.querySelectorAll('input, textarea, select');
+  fields.forEach((el, i) => {
+    const o = copies[i];
+    if (!o) return;
+    if (el.tagName === 'SELECT') o.selectedIndex = el.selectedIndex;
+    else o.value = el.value;
+  });
+}
+function clearLangGhosts() {
+  for (const g of langGhosts) g.remove();
+  langGhosts = [];
+  document.documentElement.classList.remove('lang-swap', 'lang-in');
+}
+function snapshotLang() {
+  const ghosts = [];
+  const roots = [document.querySelector('.top'), document.querySelector('.hero'), document.querySelector('.stage-foot'), document.querySelector('.left > .block'), document.querySelector('.right'), document.querySelector('.foot'), document.querySelector('.bar')];
+  for (const el of roots) {
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || r.width < 2 || r.height < 2) continue;
+    const g = el.cloneNode(true);
+    g.classList.add('lang-ghost');
+    g.setAttribute('aria-hidden', 'true');
+    g.setAttribute('inert', '');
+    g.removeAttribute('id');
+    g.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    g.querySelectorAll('[aria-live]').forEach(n => n.removeAttribute('aria-live'));
+    freezePaint(el, g);
+    g.style.position = 'fixed';
+    g.style.left = r.left + 'px';
+    g.style.top = r.top + 'px';
+    g.style.width = r.width + 'px';
+    g.style.height = r.height + 'px';
+    g.style.margin = '0';
+    g.style.maxWidth = 'none';
+    g.style.zIndex = '25';
+    g.style.pointerEvents = 'none';
+    g.style.opacity = '1';
+    g.style.transition = 'opacity .24s ease';
+    g.style.overflow = 'hidden';
+    g.style.animation = 'none';
+    document.body.appendChild(g);
+    ghosts.push(g);
+  }
+  return ghosts;
+}
+function crossfadeLang(token) {
+  clearLangGhosts();
+  const root = document.documentElement;
+  const ghosts = snapshotLang();
+  langGhosts = ghosts;
+  root.classList.remove('lang-out');
+  root.classList.add('lang-swap');
+  langFading = true;
+  try { paintLang(); } finally { langFading = false; }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (token !== langGen) return;
+    root.classList.add('lang-in');
+    for (const g of ghosts) g.style.opacity = '0';
+    setTimeout(() => {
+      if (token !== langGen) return;
+      clearLangGhosts();
+    }, 280);
+  }));
+}
+function paintLang() {
   const A = isAr(), html = document.documentElement;
   html.lang = A ? 'ar' : 'en'; html.dir = A ? 'rtl' : 'ltr';
   document.title = tr('Gleam | Instant exterior cleaning quote');
@@ -1582,12 +1777,19 @@ function applyLang() {
   syncThemeButton();
   const langs = R().langs;
   langSw.hidden = !langs;
+  if (langs && langs.includes('ar') && !document.documentElement.classList.contains('ar-font')) ensureArabicFont();
   langSw.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === state.lang));
-  caption.textContent = tr('Tap any part of your home to add it');
+  setCaption(tr('Tap any part of your home to add it'));
   renderSizes(); renderTimes(); renderCountries(); renderList(); renderDays();
   setLoc(state.loc ? 'has' : 'idle');
   for (const el of [barAmt, stageAmt, sumAmt]) setMoney(el, el._cur || 0);
   update();
+}
+function applyLang() {
+  const token = ++langGen;
+  const go = () => { if (token !== langGen) return; paintLang(); settleLang(); };
+  if (isAr()) ensureArabicFont().then(go);
+  else go();
 }
 const themeBtn = $('#themeBtn');
 function syncThemeButton() {
@@ -1597,8 +1799,13 @@ function syncThemeButton() {
 }
 function setTheme(theme) {
   const dark = theme === 'dark';
+  const toKey = dark ? 'dark' : 'light';
   const root = document.documentElement;
-  root.setAttribute('data-theme', dark ? 'dark' : 'light');
+  const from = readTheme(root);
+  const to = THEME_PARSED[toKey];
+  // Pin the colours that are on screen before the attribute change, so the first frame cannot jump.
+  writeTheme(root, from);
+  root.setAttribute('data-theme', toKey);
   root.style.colorScheme = dark ? 'only dark' : 'only light';
   const scheme = document.getElementById('colorSchemeMeta');
   if (scheme) scheme.setAttribute('content', dark ? 'only dark' : 'only light');
@@ -1606,19 +1813,50 @@ function setTheme(theme) {
   if (supported) supported.setAttribute('content', dark ? 'dark' : 'light');
   const color = document.getElementById('themeColorMeta');
   if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
-  try { localStorage.setItem('gleam.theme', dark ? 'dark' : 'light'); } catch (_) { /* ignore */ }
+  try { localStorage.setItem('gleam.theme', toKey); } catch (_) { /* ignore */ }
   syncThemeButton();
+  if (H3 && H3.syncTheme) H3.syncTheme();
+  const t0 = performance.now();
+  cancelAnimationFrame(themeRAF);
+  const step = now => {
+    const u = easeTheme((now - t0) / 450);
+    if (u >= 1) {
+      for (const v of THEME_VARS) root.style.removeProperty(v);
+    } else {
+      const cur = {};
+      for (const v of THEME_VARS) {
+        const a = from[v], b = to[v];
+        cur[v] = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u];
+      }
+      writeTheme(root, cur);
+      themeRAF = requestAnimationFrame(step);
+    }
+    if (H3 && H3.syncTheme) H3.syncTheme();
+  };
+  themeRAF = requestAnimationFrame(step);
 }
 themeBtn.addEventListener('click', () => setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
 syncThemeButton();
-requestAnimationFrame(() => document.documentElement.classList.add('theme-ready'));
 
 langSw.addEventListener('click', e => {
   const b = e.target.closest('button[data-lang]');
   if (!b || b.dataset.lang === state.lang) return;
-  state.lang = b.dataset.lang; state.langPicked = true;
+  const next = b.dataset.lang;
+  const token = ++langGen;
+  state.lang = next; state.langPicked = true;
   try { localStorage.setItem('gleam.lang', state.lang); } catch (_) { /* ignore */ }
-  applyLang();
+  const root = document.documentElement;
+  const ready = next === 'ar' ? ensureArabicFont() : Promise.resolve();
+  if (!desktop.matches) {
+    root.classList.add('lang-out');
+    Promise.all([ready, new Promise(r => setTimeout(r, 180))]).then(() => {
+      if (token !== langGen) return;
+      paintLang();
+      requestAnimationFrame(() => requestAnimationFrame(() => { if (token === langGen) root.classList.remove('lang-out'); }));
+    });
+    return;
+  }
+  ready.then(() => { if (token === langGen) crossfadeLang(token); });
 });
 
 /* ---------- start ---------- */
@@ -1631,9 +1869,9 @@ renderRegions();
 applyLang();
 renderHouse(false);
 mapBg.innerHTML = fallbackMap();
+if ('requestIdleCallback' in window) requestIdleCallback(load3d, { timeout: 1200 }); else setTimeout(load3d, 300);
 update();
 chrome();
-if ('requestIdleCallback' in window) requestIdleCallback(load3d, { timeout: 1200 }); else setTimeout(load3d, 300);
 })();
 </script>
 </body>
