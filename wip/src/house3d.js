@@ -76,7 +76,11 @@ export function mount(host, opts = {}) {
   sun.shadow.normalBias = 0.045;
   const fill = new THREE.DirectionalLight(0xffffff, 0.3 * PI);
   fill.position.set(-12, 8, -7);
-  scene.add(hemi, sun, fill);
+  // A second key for the faces the sun never sees, so the back and the left
+  // keep the same kind of shade as the front.
+  const back = new THREE.DirectionalLight(0xffffff, 0.42 * PI);
+  back.position.set(-4, 12, -16);
+  scene.add(hemi, sun, fill, back);
   sun.target.position.set(0, 1.4, 0);
   scene.add(sun.target);
   const themeDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
@@ -98,14 +102,16 @@ export function mount(host, opts = {}) {
   function applySceneTheme() {
     const t = themeMix();
     hemi.color.set(0xffffff);
-    hemi.groundColor.set(0x262626);
+    hemi.groundColor.set(0x5e6864);
     // Kept under the old level so a clean wall stays a shaded off-white,
-    // not a flat clipped white.
+    // not a flat clipped white. The ground colour lifts faces the sun misses.
     hemi.intensity = 0.48 * PI;
     sun.color.set(0xffffff);
     sun.intensity = 0.34 * PI;
     fill.color.set(0xffffff);
-    fill.intensity = 0.3 * PI;
+    fill.intensity = 0.36 * PI;
+    back.color.set(0xffffff);
+    back.intensity = 0.42 * PI;
     contactU.value = 0.40 + (0.22 - 0.40) * t;
     lawnCur.copy(LAWN_DARK).lerp(LAWN_LIGHT, t);
   }
