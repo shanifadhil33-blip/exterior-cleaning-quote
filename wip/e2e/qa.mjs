@@ -64,9 +64,14 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   ok(await page.$eval('#region', e => e.value) === mk.region, `${tag} region`);
   await page.waitForFunction(() => window.__h3d || window.__h3dError, null, { timeout: 20000 }).catch(() => {});
   ok(await page.evaluate(() => !!window.__h3d && document.querySelector('.stage').classList.contains('gl-on')), `${tag} 3D house loaded ${await page.evaluate(() => window.__h3dError || '')}`);
+  await page.waitForFunction(() => document.querySelector('.stage.gl-show'), null, { timeout: 20000 }).catch(() => {});
   await sleep(1800);
   ok(await page.evaluate(() => document.documentElement.dir) === (mk.ar ? 'rtl' : 'ltr'), `${tag} text direction`);
-  if (phone) { const f = await page.evaluate(() => window.__h3d && window.__h3d.fps()); ok(f >= 24, `${tag} phone fps ${f}`); fpsLog.push(`${tag} ${f}`); }
+  if (phone || w === 1440) {
+    const f = await page.evaluate(() => window.__h3d && window.__h3d.fps());
+    if (phone) ok(f >= 24, `${tag} phone fps ${f}`);
+    fpsLog.push(`${tag} ${f}`);
+  }
   await page.screenshot({ path: `${OUT}/${fk}-${w}-1-start.png` });
   await noSideScroll(page, tag + ' start');
   await dashCheck(page, tag + ' start');
@@ -291,9 +296,20 @@ for (const mk of MARKETS) {
       page.on('pageerror', e => errs.push(e.message));
       page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
       await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
-      await page.waitForFunction(() => window.__h3d && window.__h3d.fps() > 0, null, { timeout: 20000 }).catch(() => {});
+      await page.waitForFunction(() => {
+        const root = document.documentElement;
+        const stage = document.querySelector('.stage.gl-show');
+        const h = window.__h3d;
+        const canvas = document.querySelector('canvas.gl3');
+        if (!stage || !h || !canvas) return false;
+        if (root.classList.contains('lang-out') || root.classList.contains('lang-swap')) return false;
+        if (getComputedStyle(canvas).opacity !== '1') return false;
+        const v = h.view();
+        const key = [v.az, v.el, v.dist, h.dirt('walls'), h.dirt('roof')].map(n => (+n).toFixed(4)).join();
+        if (window.__schemeKey !== key) { window.__schemeKey = key; window.__schemeN = 0; return false; }
+        return ++window.__schemeN >= 4;
+      }, null, { timeout: 20000 }).catch(() => {});
       await page.evaluate(() => document.fonts.ready);
-      await sleep(500);
       const info = await page.evaluate(() => {
         const bg = el => el ? getComputedStyle(el).backgroundColor : '';
         const cs = getComputedStyle(document.documentElement);
