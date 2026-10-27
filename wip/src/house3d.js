@@ -290,7 +290,7 @@ export function mount(host, opts = {}) {
     const lawn = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), lawnMat);
     lawn.rotation.x = -Math.PI / 2;
     lawn.position.set(cx, -0.03, cz);
-    const lawnFit = 0.74;
+    const lawnFit = 0.66;
     lawn.scale.set(lawnW * lawnFit, lawnD * lawnFit, 1);
     lawn.renderOrder = -2;
     lawn.castShadow = false;
@@ -983,7 +983,7 @@ export function mount(host, opts = {}) {
   const VIEW = { az: 0.42, el: 0.37, sway: 0.26, swaySpeed: 0.2, fov: 30 };
   const phoneLayout = () => (window.innerWidth || host.clientWidth || 1200) < 960;
   const camFov = () => phoneLayout() ? 16 : VIEW.fov;
-  const viewLimit = () => phoneLayout() ? 0.94 : 0.84;
+  const viewLimit = () => phoneLayout() ? 0.97 : 0.84;
   const EL_MIN = 0.05, EL_MAX = 0.95;
   let yaw = 0, yawT = 0, velYaw = 0, el = VIEW.el, elT = VIEW.el, velEl = 0;
   let drag = null, lastInput = -1e9, idlePhase = 0, hold = false;
@@ -1080,10 +1080,22 @@ export function mount(host, opts = {}) {
         }
         return;
       }
-      if (!geo.boundingBox) geo.computeBoundingBox();
-      const bb = geo.boundingBox;
-      for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
-        corner.set(x, y, z).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
+      // Boxes are their corners. Roofs and other meshes use real vertices so a
+      // loose bounding box does not hold the camera back from the silhouette.
+      if (geo.type === 'BoxGeometry') {
+        if (!geo.boundingBox) geo.computeBoundingBox();
+        const bb = geo.boundingBox;
+        for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+          corner.set(x, y, z).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
+          pts.push(corner.x, corner.y, corner.z);
+        }
+        return;
+      }
+      const pos = geo.attributes && geo.attributes.position;
+      if (!pos) return;
+      const stride = Math.max(1, Math.floor(pos.count / 28));
+      for (let i = 0; i < pos.count; i += stride) {
+        corner.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
         pts.push(corner.x, corner.y, corner.z);
       }
     });
@@ -1238,6 +1250,8 @@ export function mount(host, opts = {}) {
       _look.z + Math.cos(az) * ce * d
     );
     camera.up.set(0, 1, 0);
+    // Phone: sit the roof higher so the lawn fade stays on the canvas.
+    if (phoneLayout()) _look.y -= sphere.r * 0.22;
     camera.lookAt(_look);
     const near = Math.max(0.08, (d - sphere.r) * 0.45);
     camera.near = Math.min(near, Math.max(0.08, d * 0.25));
@@ -1279,7 +1293,7 @@ export function mount(host, opts = {}) {
     const vh = window.innerHeight || 700;
     // Phone: a taller stage narrows the horizontal view so the front of the
     // house can fill the width without the top-down orbit leaving the frame.
-    const h = Math.round(wide ? Math.min(w / 1.12, vh * 0.74) : Math.min(w / 1.28, vh * 0.44));
+    const h = Math.round(wide ? Math.min(w / 1.12, vh * 0.74) : Math.min(w / 1.18, vh * 0.48));
     // A language switch can notify the observer without changing the drawing size.
     // Skip that so the camera is not framed again. A real rebuild still reframes.
     if (fromObserver && (!host.clientWidth || (w === viewW && h === viewH))) return;

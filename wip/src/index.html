@@ -289,7 +289,7 @@ button{cursor:pointer;touch-action:manipulation}
 .svc.on .chk{background:var(--ink);border-color:var(--ink)}
 .svc.on .chk svg{opacity:1;transform:none}
 @media (max-width:959px){
-  .stage-wrap{padding-inline:8px}
+  .stage-wrap{padding-inline:0}
   .svc-main,.seg button,.day,.chip,#sumBtn,#locBtn,.svc{scroll-margin-top:min(470px,58vh);scroll-margin-bottom:110px}
 }
 .opt-wrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s var(--ease)}
@@ -463,7 +463,7 @@ html[data-theme="dark"] .theme .moon{opacity:1;transform:none}
 /* 3D house */
 .stage{position:relative;container-type:inline-size}
 html.gl-wait .house{visibility:hidden;height:min(calc(100cqi / 1.12),74svh);max-height:none;padding-top:0}
-@media (max-width:959px){html.gl-wait .house{height:min(calc(100cqi / 1.28),44svh)}}
+@media (max-width:959px){html.gl-wait .house{height:min(calc(100cqi / 1.18),48svh)}}
 .gl3{position:absolute;left:0;right:0;top:0;width:100%;display:block;touch-action:pan-y;outline:none;cursor:grab;background-color:#ECEEEE;background-color:var(--bg);opacity:0;pointer-events:none}
 .gl3:active{cursor:grabbing}
 .stage.gl-on .house{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;pointer-events:none}
