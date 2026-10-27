@@ -569,9 +569,12 @@ export function mount(host, opts = {}) {
       pg.g.add(box(span, gutH, gutD, gutMat, x0, gutY, zE - gutD / 2));
       pg.g.add(box(span, gutH, gutD, gutMat, x0, gutY, -(zE - gutD / 2)));
       // Hip roofs and flat parapets have side eaves. A gable end does not.
+      // The side run used to share its end faces with the front and back
+      // gutters. Those coplanar corners flashed on the back wall.
       if (flat || !s.neigh) {
-        if (s.neigh !== 'left' && s.neigh !== 'both') pg.g.add(box(gutD, gutH, zE * 2, gutMat, xL, gutY, 0));
-        if (s.neigh !== 'both') pg.g.add(box(gutD, gutH, zE * 2, gutMat, xR, gutY, 0));
+        const sideLen = Math.max(0.2, (zE - gutD * 0.4) * 2);
+        if (s.neigh !== 'left' && s.neigh !== 'both') pg.g.add(box(gutD, gutH, sideLen, gutMat, xL, gutY, 0));
+        if (s.neigh !== 'both') pg.g.add(box(gutD, gutH, sideLen, gutMat, xR, gutY, 0));
       }
       const pipeTop = gutY - gutH / 2, pipeH = Math.max(0.4, pipeTop + 0.02);
       const pipe = (x, z) => pg.g.add(box(0.1, pipeH, 0.1, gutMat, x, pipeTop - pipeH / 2, z));
