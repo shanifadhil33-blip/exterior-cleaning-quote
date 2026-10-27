@@ -282,10 +282,10 @@ export function mount(host, opts = {}) {
     // page colour, so the edge never reads as a ring or a hard cut.
     const cx = x0 + gw / 2;
     const zSolidMin = -front - 0.45;
-    const zSolidMax = front + 1.85;
+    const zSolidMax = front + 3.3;
     const cz = (zSolidMin + zSolidMax) / 2;
     const fadeAt = 0.68;
-    const lawnW = (((W + gw) / 2 + 0.7) / fadeAt) * 2;
+    const lawnW = (((W + gw) / 2 + 1.35) / fadeAt) * 2;
     const lawnD = ((Math.max(zSolidMax - cz, cz - zSolidMin)) / fadeAt) * 2;
     const lawn = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), lawnMat);
     lawn.rotation.x = -Math.PI / 2;
@@ -411,11 +411,17 @@ export function mount(host, opts = {}) {
     const pwin = part('windows');
     const glassMat = dirtyMat(pwin, C.glassDirty, C.glass, { roughness: 0.16, metalness: 0.04, emissive: col('#000000') });
     const frameMat = M(C.frame, { roughness: 0.92 });
+    const pane = (w, h, d, x, y, z) => {
+      const m = box(w, h, d, glassMat, x, y, z);
+      m.userData.pane = true;
+      m.castShadow = false;
+      return m;
+    };
     const doorBay = s.bays > 2 ? Math.floor(s.bays / 2) : 0;
     const winFace = (wx, wy, wz, out) => {
       pwin.g.add(box(0.68, 0.64, 0.05, revealMat, wx, wy, wz));
       pwin.g.add(box(0.58, 0.54, 0.05, frameMat, wx, wy, wz + out * 0.02));
-      pwin.g.add(box(0.46, 0.42, 0.03, glassMat, wx, wy, wz + out * 0.04));
+      pwin.g.add(pane(0.46, 0.42, 0.03, wx, wy, wz + out * 0.04));
       pwin.g.add(box(0.07, 0.42, 0.03, frameMat, wx, wy, wz + out * 0.05));
       pwin.g.add(box(0.46, 0.07, 0.03, frameMat, wx, wy, wz + out * 0.05));
       pwin.g.add(box(0.76, 0.05, 0.08, frameMat, wx, wy - 0.36, wz + out * 0.02));
@@ -437,7 +443,7 @@ export function mount(host, opts = {}) {
         const wy = f * FH + 0.55;
         pwin.g.add(box(0.05, 0.5, 0.52, revealMat, sx, wy, z));
         pwin.g.add(box(0.04, 0.4, 0.4, frameMat, sx + sign * 0.02, wy, z));
-        pwin.g.add(box(0.04, 0.3, 0.3, glassMat, sx + sign * 0.04, wy, z));
+        pwin.g.add(pane(0.04, 0.3, 0.3, sx + sign * 0.04, wy, z));
         pwin.g.add(box(0.055, 0.3, 0.06, frameMat, sx + sign * 0.055, wy, z));
       }
     };
@@ -450,7 +456,7 @@ export function mount(host, opts = {}) {
         const sx = x0 + sign * ((W + 0.3) / 2 + 0.03);
         pwin.g.add(box(0.05, 0.32, 0.38, revealMat, sx, H + 0.28, 0));
         pwin.g.add(box(0.05, 0.22, 0.26, frameMat, sx + sign * 0.03, H + 0.28, 0));
-        pwin.g.add(box(0.05, 0.16, 0.18, glassMat, sx + sign * 0.05, H + 0.28, 0));
+        pwin.g.add(pane(0.05, 0.16, 0.18, sx + sign * 0.05, H + 0.28, 0));
       };
       // Hip roofs have no gable face. A shared wall buries the end it covers.
       if (s.neigh && s.neigh !== 'left' && s.neigh !== 'both') gableLight(-1);
@@ -459,12 +465,12 @@ export function mount(host, opts = {}) {
     if (gw) {
       pwin.g.add(box(0.52, 0.38, 0.04, revealMat, gx, 0.62, gBack - 0.02));
       pwin.g.add(box(0.4, 0.26, 0.04, frameMat, gx, 0.62, gBack - 0.05));
-      pwin.g.add(box(0.3, 0.16, 0.03, glassMat, gx, 0.62, gBack - 0.07));
+      pwin.g.add(pane(0.3, 0.16, 0.03, gx, 0.62, gBack - 0.07));
       pwin.g.add(box(Math.min(0.7, gw - 0.4), 0.22, 0.04, revealMat, gx, 0.86, gFront + 0.02));
-      pwin.g.add(box(Math.min(0.56, gw - 0.52), 0.14, 0.03, glassMat, gx, 0.86, gFront + 0.06));
+      pwin.g.add(pane(Math.min(0.56, gw - 0.52), 0.14, 0.03, gx, 0.86, gFront + 0.06));
       pwin.g.add(box(0.05, 0.42, 0.48, revealMat, gx + gw / 2 + 0.02, 0.58, gZ));
       pwin.g.add(box(0.04, 0.32, 0.36, frameMat, gx + gw / 2 + 0.05, 0.58, gZ));
-      pwin.g.add(box(0.025, 0.22, 0.26, glassMat, gx + gw / 2 + 0.07, 0.58, gZ));
+      pwin.g.add(pane(0.025, 0.22, 0.26, gx + gw / 2 + 0.07, 0.58, gZ));
     }
 
     // roof, dropped into the wall so the soffit is not coplanar with the wall top
@@ -496,14 +502,14 @@ export function mount(host, opts = {}) {
       roof.position.set(x0, H - roofSink, 0); pr.g.add(roof);
       if (gw) { const gr = gable(gw + 0.36, gDepth + 0.4, 0.48, roofMat); gr.position.set(gx, 0.96, gZ); pr.g.add(gr); }
       slope = Math.atan2(RH, RD / 2);
-      const mossMat = new THREE.MeshStandardMaterial({ color: col(C.moss), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
+      const mossMat = new THREE.MeshStandardMaterial({ color: col('#7f8f62'), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
       const ny = Math.cos(slope), nz = Math.sin(slope);
-      for (let i = 0; i < 16 + s.bays * 4; i++) {
+      for (let i = 0; i < 13 + s.bays * 3; i++) {
         const t = 0.15 + r() * 0.75, z = (RD / 2) * (1 - t), y = H - roofSink + RH * t;
         const half = (RW / 2) * (s.neigh ? 1 : (1 - t * 0.85)) - 0.1;
-        const rad = 0.05 + r() * 0.06, lift = rad + 0.04;
+        const rad = 0.04 + r() * 0.045, lift = rad + 0.035;
         const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 0), mossMat);
-        m.position.set(x0 + (r() * 2 - 1) * half, y + ny * lift, z + nz * lift); m.scale.y = 0.5;
+        m.position.set(x0 + (r() * 2 - 1) * half, y + ny * lift, z + nz * lift); m.scale.y = 0.42;
         m.castShadow = false;
         grime(pr, m, 'shrink');
       }
@@ -585,27 +591,43 @@ export function mount(host, opts = {}) {
       }
     }
 
-    // One paved surface: driveway, path and patio share a height and a rounded rim,
-    // and the whole plate stays inside the solid part of the lawn.
+    // Path and driveway are separate strips that run out to the lawn, joined by a
+    // shallow threshold so they read as one flush surface, not a doormat.
     const pd = part('driveway');
     const pp = part('patio');
-    const dw = gw ? gw + 0.15 : 1.15, dx = gw ? gx : x0 + W / 2 - dw / 2 - 0.05;
-    const px = gw || s.neigh ? x0 - W / 2 + 0.75 : x0 - W / 2 - 0.1;
+    const dw = gw ? gw + 0.15 : 1.28, dx0 = gw ? gx : x0 + W / 2 - dw / 2 - 0.05;
     const lawnSx = lawnW * lawnFit, lawnSy = lawnD * lawnFit;
+    const lawnLimit = 0.62;
     const onLawn = (x, z) => {
       const u = (x - cx) / lawnSx, v = (z - cz) / lawnSy;
-      return Math.hypot(u, v) * 2 <= 0.56;
+      return Math.hypot(u, v) * 2 <= lawnLimit;
     };
-    let padL = Math.min(px - 0.62, doorX - 0.34, dx - dw / 2);
-    let padR = Math.max(px + 0.62, doorX + 0.34, dx + dw / 2);
-    let padNear = front + 0.04;
-    let padFar = front + 1.15;
-    for (let n = 0; n < 24 && !onLawn(padL, padFar); n++) padL += 0.04;
-    for (let n = 0; n < 24 && !onLawn(padR, padFar); n++) padR -= 0.04;
-    for (let n = 0; n < 24 && (!onLawn(padL, padFar) || !onLawn(padR, padFar) || !onLawn((padL + padR) / 2, padFar)); n++) padFar -= 0.04;
-    const padW = Math.max(0.8, padR - padL), padD = Math.max(0.45, padFar - padNear);
-    const padCx = (padL + padR) / 2, padCz = (padNear + padFar) / 2;
-    const seam = THREE.MathUtils.clamp(dx - dw / 2, padL + 0.2, padR - 0.2);
+    const near = front + 0.02;
+    const pathW = 0.72;
+    const driveW0 = gw ? Math.max(gw + 0.12, dw) : 1.28;
+    let pathL = doorX - pathW / 2, pathR = doorX + pathW / 2;
+    let driveL = dx0 - driveW0 / 2, driveR = dx0 + driveW0 / 2;
+    if (pathR > driveL && pathL < driveR) {
+      if (dx0 >= doorX) { driveL = pathR + 0.1; driveR = driveL + driveW0; }
+      else { driveR = pathL - 0.1; driveL = driveR - driveW0; }
+    }
+    let driveCx = (driveL + driveR) / 2, driveHalf = (driveR - driveL) / 2;
+    while (driveHalf > 0.42 && !(onLawn(driveCx - driveHalf, near + 0.2) && onLawn(driveCx + driveHalf, near + 0.2))) driveHalf -= 0.03;
+    driveL = driveCx - driveHalf;
+    driveR = driveCx + driveHalf;
+    const reach = (x, half) => {
+      let best = near + 0.28;
+      for (let z = best; z <= front + 5.5; z += 0.02) {
+        if (onLawn(x - half, z) && onLawn(x + half, z)) best = z;
+        else break;
+      }
+      return best;
+    };
+    const pathFar = reach(doorX, pathW / 2);
+    const driveFar = reach(driveCx, driveHalf);
+    const apronFar = near + 0.34;
+    const apronL = Math.min(pathL, driveL), apronR = Math.max(pathR, driveR);
+    const seam = driveCx >= doorX ? (Math.min(pathR, driveL) + Math.max(pathR, driveL)) / 2 : (Math.min(driveR, pathL) + Math.max(driveR, pathL)) / 2;
     const paveU = {
       driveA: { value: col(C.paveDirty) }, driveB: { value: col(C.pave) },
       patioA: { value: col(C.paveDirty) }, patioB: { value: col(C.pave) },
@@ -641,23 +663,96 @@ export function mount(host, opts = {}) {
     };
     pd.mats.push(paveMat);
     pp.mats.push(paveMat);
-    const rad = Math.min(0.22, padW * 0.18, padD * 0.35);
-    const plateShape = new THREE.Shape();
-    plateShape.moveTo(-padW / 2 + rad, -padD / 2);
-    plateShape.lineTo(padW / 2 - rad, -padD / 2);
-    plateShape.absarc(padW / 2 - rad, -padD / 2 + rad, rad, -Math.PI / 2, 0, false);
-    plateShape.lineTo(padW / 2, padD / 2 - rad);
-    plateShape.absarc(padW / 2 - rad, padD / 2 - rad, rad, 0, Math.PI / 2, false);
-    plateShape.lineTo(-padW / 2 + rad, padD / 2);
-    plateShape.absarc(-padW / 2 + rad, padD / 2 - rad, rad, Math.PI / 2, Math.PI, false);
-    plateShape.lineTo(-padW / 2, -padD / 2 + rad);
-    plateShape.absarc(-padW / 2 + rad, -padD / 2 + rad, rad, Math.PI, Math.PI * 1.5, false);
+    const unionOutline = rects => {
+      const eps = 1e-4;
+      const xs = [], zs = [];
+      rects.forEach(rc => { xs.push(rc.l, rc.r); zs.push(rc.n, rc.f); });
+      const uniq = arr => {
+        arr.sort((a, b) => a - b);
+        const o = [];
+        arr.forEach(v => { if (!o.length || v - o[o.length - 1] > eps) o.push(v); });
+        return o;
+      };
+      const X = uniq(xs), Z = uniq(zs);
+      const nx = X.length - 1, nz = Z.length - 1;
+      const inside = (i, j) => {
+        if (i < 0 || j < 0 || i >= nx || j >= nz) return false;
+        const mx = (X[i] + X[i + 1]) / 2, mz = (Z[j] + Z[j + 1]) / 2;
+        return rects.some(rc => mx >= rc.l - eps && mx <= rc.r + eps && mz >= rc.n - eps && mz <= rc.f + eps);
+      };
+      const key = (i, j) => i + ',' + j;
+      const adj = new Map();
+      const link = (a, b) => {
+        const k = key(a[0], a[1]);
+        if (!adj.has(k)) adj.set(k, []);
+        adj.get(k).push(b);
+      };
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+        if (!inside(i, j)) continue;
+        if (!inside(i - 1, j)) link([i, j + 1], [i, j]);
+        if (!inside(i + 1, j)) link([i + 1, j], [i + 1, j + 1]);
+        if (!inside(i, j - 1)) link([i, j], [i + 1, j]);
+        if (!inside(i, j + 1)) link([i + 1, j + 1], [i, j + 1]);
+      }
+      let start = null;
+      adj.forEach((_, k) => { if (start === null || k < start) start = k; });
+      const raw = [];
+      let cur = start.split(',').map(Number);
+      const used = new Set();
+      const origin = cur.slice();
+      for (let n = 0; n < 80; n++) {
+        raw.push(new THREE.Vector2(X[cur[0]], -Z[cur[1]]));
+        const opts = (adj.get(key(cur[0], cur[1])) || []).filter(p => !used.has(key(cur[0], cur[1]) + '>' + key(p[0], p[1])));
+        if (!opts.length) break;
+        const nxt = opts[0];
+        used.add(key(cur[0], cur[1]) + '>' + key(nxt[0], nxt[1]));
+        if (nxt[0] === origin[0] && nxt[1] === origin[1]) break;
+        cur = nxt;
+      }
+      let area = 0;
+      for (let i = 0; i < raw.length; i++) {
+        const p = raw[i], q = raw[(i + 1) % raw.length];
+        area += p.x * q.y - q.x * p.y;
+      }
+      if (area < 0) raw.reverse();
+      return raw;
+    };
+    const roundedShape = (pts, rad) => {
+      const shape = new THREE.Shape();
+      const N = pts.length;
+      const at = i => pts[(i + N) % N];
+      for (let i = 0; i < N; i++) {
+        const a = at(i - 1), b = at(i), c = at(i + 1);
+        const abx = b.x - a.x, aby = b.y - a.y, bcx = c.x - b.x, bcy = c.y - b.y;
+        const lab = Math.hypot(abx, aby) || 1, lbc = Math.hypot(bcx, bcy) || 1;
+        const cross = abx * bcy - aby * bcx;
+        const rr = Math.min(rad, lab * 0.45, lbc * 0.45);
+        if (cross <= 1e-5 || rr < 0.02) {
+          if (i === 0) shape.moveTo(b.x, b.y);
+          else shape.lineTo(b.x, b.y);
+          continue;
+        }
+        const p1x = b.x - (abx / lab) * rr, p1y = b.y - (aby / lab) * rr;
+        const p2x = b.x + (bcx / lbc) * rr, p2y = b.y + (bcy / lbc) * rr;
+        if (i === 0) shape.moveTo(p1x, p1y);
+        else shape.lineTo(p1x, p1y);
+        shape.quadraticCurveTo(b.x, b.y, p2x, p2y);
+      }
+      shape.closePath();
+      return shape;
+    };
+    const platePts = unionOutline([
+      { l: pathL, r: pathR, n: near, f: pathFar },
+      { l: driveL, r: driveR, n: near, f: driveFar },
+      { l: apronL, r: apronR, n: near, f: apronFar },
+    ]);
+    const plateShape = roundedShape(platePts, 0.14);
     const plateGeo = new THREE.ExtrudeGeometry(plateShape, {
-      depth: 0.01, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.045, bevelSegments: 2, curveSegments: 5,
+      depth: 0.012, bevelEnabled: false, curveSegments: 4,
     });
     plateGeo.rotateX(-Math.PI / 2);
     plateGeo.computeBoundingBox();
-    plateGeo.translate(padCx, -0.012 - plateGeo.boundingBox.max.y, padCz);
+    plateGeo.translate(0, -0.012 - plateGeo.boundingBox.max.y, 0);
     const plate = new THREE.Mesh(plateGeo, paveMat);
     plate.castShadow = false;
     plate.receiveShadow = false;
@@ -666,25 +761,25 @@ export function mount(host, opts = {}) {
     root.add(plate);
     const plateTop = -0.012;
     const pickMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, toneMapped: false });
-    const pickBox = (parent, w, x) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.2, w), 0.06, padD), pickMat);
-      m.position.set(x, plateTop, padCz);
+    const pickStrip = (parent, l, r, z0, z1) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.2, r - l), 0.06, Math.max(0.2, z1 - z0)), pickMat);
+      m.position.set((l + r) / 2, plateTop, (z0 + z1) / 2);
       m.castShadow = false;
       m.receiveShadow = false;
       parent.add(m);
     };
-    pickBox(pd.g, padR - seam, (padR + seam) / 2);
-    pickBox(pp.g, seam - padL, (seam + padL) / 2);
+    pickStrip(pd.g, driveL, driveR, near, driveFar);
+    pickStrip(pp.g, pathL, pathR, near, pathFar);
     for (let i = 0; i < 6; i++) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(0.08 + r() * 0.12, 8), decalMat(C.grime, 0.45));
+      const m = new THREE.Mesh(new THREE.CircleGeometry(0.07 + r() * 0.1, 8), decalMat(C.grime, 0.45));
       m.rotation.x = -Math.PI / 2;
-      m.position.set(THREE.MathUtils.clamp(dx + (r() - 0.5) * (dw - 0.2), seam + 0.08, padR - 0.12), plateTop + 0.02, padNear + 0.12 + r() * (padD - 0.28));
+      m.position.set(driveL + 0.12 + r() * Math.max(0.2, driveR - driveL - 0.24), plateTop + 0.02, near + 0.16 + r() * Math.max(0.2, driveFar - near - 0.32));
       grime(pd, m, 'fade');
     }
     for (let i = 0; i < 5; i++) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(0.07 + r() * 0.1, 7), decalMat(i % 2 ? C.moss : C.grime, 0.45));
+      const m = new THREE.Mesh(new THREE.CircleGeometry(0.06 + r() * 0.08, 7), decalMat(i % 2 ? C.moss : C.grime, 0.45));
       m.rotation.x = -Math.PI / 2;
-      m.position.set(THREE.MathUtils.clamp(px + (r() - 0.5) * 0.9, padL + 0.12, seam - 0.08), plateTop + 0.02, padNear + 0.16 + r() * (padD - 0.32));
+      m.position.set(pathL + 0.1 + r() * Math.max(0.16, pathR - pathL - 0.2), plateTop + 0.02, near + 0.18 + r() * Math.max(0.2, pathFar - near - 0.36));
       grime(pp, m, 'fade');
     }
 
@@ -758,10 +853,54 @@ export function mount(host, opts = {}) {
     });
   }
 
+  function glassShine(mesh, mat) {
+    const g = mesh.geometry.parameters;
+    const dims = [g.width, g.height, g.depth];
+    let thin = 0;
+    if (dims[1] <= dims[thin]) thin = 1;
+    if (dims[2] <= dims[thin]) thin = 2;
+    const geo = thin === 0
+      ? new THREE.PlaneGeometry(dims[2], dims[1])
+      : new THREE.PlaneGeometry(dims[0], dims[1]);
+    const plane = new THREE.Mesh(geo, mat);
+    plane.castShadow = false;
+    plane.receiveShadow = false;
+    plane.renderOrder = 6;
+    plane.userData.frame = false;
+    const lift = dims[thin] / 2 + 0.008;
+    if (thin === 0) {
+      plane.rotation.y = Math.PI / 2;
+      plane.position.x = (Math.sign(mesh.position.x) || 1) * lift;
+    } else {
+      plane.position.z = (Math.sign(mesh.position.z) || 1) * lift;
+    }
+    mesh.add(plane);
+    return plane;
+  }
+
   // a sweep of light across the part, a glow, and spray particles
   function wash(id) {
     const p = parts[id];
     if (!p || reduced) return;
+    if (id === 'windows') {
+      const panes = [];
+      p.g.traverse(o => { if (o.userData && o.userData.pane) panes.push(o); });
+      const mat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        toneMapped: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -4,
+        polygonOffsetUnits: -4,
+        uniforms: { uT: { value: 0 }, uA: { value: 0 } },
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'varying vec2 vUv; uniform float uT; uniform float uA; void main(){ float y = vUv.y - (1.2 - uT * 1.55); float band = exp(-pow(y / 0.042, 2.0)); float side = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x); gl_FragColor = vec4(1.0, 1.0, 1.0, band * side * 0.22 * uA); }',
+      });
+      const planes = panes.map(mesh => glassShine(mesh, mat));
+      fxList.push({ p, mode: 'glass', planes, shine: mat, t0: performance.now(), dur: 1300 });
+      return;
+    }
     const bb = new THREE.Box3().setFromObject(p.g);
     if (bb.isEmpty()) return;
     const size = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
@@ -781,6 +920,17 @@ export function mount(host, opts = {}) {
   function stepFx(now, dt) {
     fxList = fxList.filter(f => {
       const t = (now - f.t0) / f.dur;
+      if (f.mode === 'glass') {
+        if (t >= 1) {
+          f.planes.forEach(pl => { if (pl.parent) pl.parent.remove(pl); pl.geometry.dispose(); });
+          f.shine.dispose();
+          return false;
+        }
+        const u = Math.min(1, t);
+        f.shine.uniforms.uT.value = u;
+        f.shine.uniforms.uA.value = Math.sin(Math.PI * u);
+        return true;
+      }
       if (t >= 1) {
         root.remove(f.sheet, f.pts); f.sheet.geometry.dispose(); f.sheet.material.dispose(); f.pts.geometry.dispose(); f.pts.material.dispose();
         f.p.mats.forEach(m => m.emissive && m.emissive.setScalar(0));
@@ -833,7 +983,7 @@ export function mount(host, opts = {}) {
   const VIEW = { az: 0.42, el: 0.37, sway: 0.26, swaySpeed: 0.2, fov: 30 };
   const phoneLayout = () => (window.innerWidth || host.clientWidth || 1200) < 960;
   const camFov = () => phoneLayout() ? 16 : VIEW.fov;
-  const viewLimit = () => phoneLayout() ? 0.92 : 0.84;
+  const viewLimit = () => phoneLayout() ? 0.94 : 0.84;
   const EL_MIN = 0.05, EL_MAX = 0.95;
   let yaw = 0, yawT = 0, velYaw = 0, el = VIEW.el, elT = VIEW.el, velEl = 0;
   let drag = null, lastInput = -1e9, idlePhase = 0, hold = false;
@@ -957,6 +1107,9 @@ export function mount(host, opts = {}) {
 
   let fitKey = '';
   let fitDist = 14;
+  let fitEls = null;
+  let fitYaws = null;
+  let fitGrid = null;
   function sphereDist() {
     const half = THREE.MathUtils.degToRad(camFov() / 2);
     const tanV = Math.tan(half);
@@ -964,39 +1117,110 @@ export function mount(host, opts = {}) {
     const ang = Math.atan(Math.min(tanV, tanH) * 0.96);
     return sphere.r / Math.max(0.12, Math.sin(ang));
   }
-  function targetDist() {
-    if (!sphere) return 14;
-    const limit = viewLimit();
-    const key = (camera.aspect || 1).toFixed(3) + ':' + sphere.r.toFixed(3) + ':' + sphere.cx.toFixed(2) + ':' + sphere.cz.toFixed(2) + ':' + limit + ':' + camFov();
-    if (key === fitKey) return fitDist;
-    const upper = sphereDist();
-    const savedYaw = yaw, savedEl = el;
+  function fitDistanceAt(elValue, limit) {
     const yaws = [0.42, 0.42 + Math.PI / 2, 0.42 + Math.PI, 0.42 - Math.PI / 2, Math.PI / 5, Math.PI * 1.25];
-    const els = [EL_MIN, VIEW.el, EL_MAX];
     const fits = d => {
       for (const az of yaws) {
-        for (const e of els) {
-          yaw = VIEW.az - az;
-          el = e;
-          applyCamera(d);
-          const cov = projectSpan(limit);
-          if (!cov || cov.outside) return false;
-        }
+        yaw = VIEW.az - az;
+        el = elValue;
+        applyCamera(d);
+        const cov = projectSpan(limit);
+        if (!cov || cov.outside) return false;
       }
       return true;
     };
-    let lo = upper * 0.38, hi = upper;
-    if (!fits(hi)) hi = upper * 1.35;
-    for (let i = 0; i < 11; i++) {
+    const upper = sphereDist();
+    let lo = upper * 0.32, hi = upper;
+    if (!fits(hi)) hi = upper * 1.55;
+    for (let i = 0; i < 12; i++) {
       const mid = (lo + hi) / 2;
       if (fits(mid)) hi = mid;
       else lo = mid;
     }
-    yaw = savedYaw;
-    el = savedEl;
-    fitKey = key;
-    fitDist = hi;
-    return fitDist;
+    return hi;
+  }
+  function fitOne(az, elValue, limit) {
+    const fits = d => {
+      yaw = VIEW.az - az;
+      el = elValue;
+      applyCamera(d);
+      const cov = projectSpan(limit);
+      return !!(cov && !cov.outside);
+    };
+    const upper = sphereDist();
+    let lo = upper * 0.28, hi = upper;
+    if (!fits(hi)) hi = upper * 1.7;
+    for (let i = 0; i < 12; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) hi = mid;
+      else lo = mid;
+    }
+    return hi;
+  }
+  function sampleGrid(az, e) {
+    const yaws = fitYaws, n = yaws.length, span = Math.PI * 2;
+    let u = (az - yaws[0]) % span;
+    if (u < 0) u += span;
+    const step = span / n;
+    const i = Math.floor(u / step) % n;
+    const f = (u - i * step) / step;
+    const i2 = (i + 1) % n;
+    const els = fitEls;
+    let j = 0;
+    while (j < els.length - 2 && e > els[j + 1]) j++;
+    const t = (e - els[j]) / Math.max(1e-4, els[j + 1] - els[j]);
+    const tt = Math.min(1, Math.max(0, t));
+    const d0 = fitGrid[j][i] * (1 - f) + fitGrid[j][i2] * f;
+    const d1 = fitGrid[j + 1][i] * (1 - f) + fitGrid[j + 1][i2] * f;
+    return d0 * (1 - tt) + d1 * tt;
+  }
+  function targetDist() {
+    if (!sphere) return 14;
+    const limit = viewLimit();
+    const phone = phoneLayout();
+    const key = (camera.aspect || 1).toFixed(3) + ':' + sphere.r.toFixed(3) + ':' + sphere.cx.toFixed(2) + ':' + sphere.cz.toFixed(2) + ':' + limit + ':' + camFov() + ':' + (phone ? 'p' : 'd');
+    if (key !== fitKey) {
+      const savedYaw = yaw, savedEl = el;
+      const upper = sphereDist();
+      const yaws = [0.42, 0.42 + Math.PI / 2, 0.42 + Math.PI, 0.42 - Math.PI / 2, Math.PI / 5, Math.PI * 1.25];
+      if (!phone) {
+        const els = [EL_MIN, VIEW.el, EL_MAX];
+        const fits = d => {
+          for (const az of yaws) {
+            for (const e of els) {
+              yaw = VIEW.az - az;
+              el = e;
+              applyCamera(d);
+              const cov = projectSpan(limit);
+              if (!cov || cov.outside) return false;
+            }
+          }
+          return true;
+        };
+        let lo = upper * 0.38, hi = upper;
+        if (!fits(hi)) hi = upper * 1.35;
+        for (let i = 0; i < 11; i++) {
+          const mid = (lo + hi) / 2;
+          if (fits(mid)) hi = mid;
+          else lo = mid;
+        }
+        fitDist = hi;
+        fitEls = null;
+        fitYaws = null;
+        fitGrid = null;
+      } else {
+        fitYaws = [];
+        for (let i = 0; i < 8; i++) fitYaws.push(0.42 + i * Math.PI / 4);
+        fitEls = [EL_MIN, 0.2, VIEW.el, 0.58, 0.78, EL_MAX];
+        fitGrid = fitEls.map(e => fitYaws.map(az => fitOne(az, e, limit)));
+        fitDist = 14;
+      }
+      yaw = savedYaw;
+      el = savedEl;
+      fitKey = key;
+    }
+    if (!fitGrid) return fitDist;
+    return sampleGrid(VIEW.az - yaw, Math.max(EL_MIN, Math.min(EL_MAX, Math.max(el, elT))));
   }
   function springStep(x, v, target, k, c, dt) {
     const nv = v + (k * (target - x) - c * v) * dt;
@@ -1055,7 +1279,7 @@ export function mount(host, opts = {}) {
     const vh = window.innerHeight || 700;
     // Phone: a taller stage narrows the horizontal view so the front of the
     // house can fill the width without the top-down orbit leaving the frame.
-    const h = Math.round(wide ? Math.min(w / 1.12, vh * 0.74) : Math.min(w / 1.02, vh * 0.5));
+    const h = Math.round(wide ? Math.min(w / 1.12, vh * 0.74) : Math.min(w / 1.28, vh * 0.44));
     // A language switch can notify the observer without changing the drawing size.
     // Skip that so the camera is not framed again. A real rebuild still reframes.
     if (fromObserver && (!host.clientWidth || (w === viewW && h === viewH))) return;
