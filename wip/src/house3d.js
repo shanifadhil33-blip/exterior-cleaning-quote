@@ -76,11 +76,7 @@ export function mount(host, opts = {}) {
   sun.shadow.normalBias = 0.045;
   const fill = new THREE.DirectionalLight(0xffffff, 0.3 * PI);
   fill.position.set(-12, 8, -7);
-  // A second key for the faces the sun never sees, so the back and the left
-  // keep the same kind of shade as the front.
-  const back = new THREE.DirectionalLight(0xffffff, 0.42 * PI);
-  back.position.set(-4, 12, -16);
-  scene.add(hemi, sun, fill, back);
+  scene.add(hemi, sun, fill);
   sun.target.position.set(0, 1.4, 0);
   scene.add(sun.target);
   const themeDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
@@ -109,9 +105,7 @@ export function mount(host, opts = {}) {
     sun.color.set(0xffffff);
     sun.intensity = 0.34 * PI;
     fill.color.set(0xffffff);
-    fill.intensity = 0.36 * PI;
-    back.color.set(0xffffff);
-    back.intensity = 0.42 * PI;
+    fill.intensity = 0.5 * PI;
     contactU.value = 0.40 + (0.22 - 0.40) * t;
     lawnCur.copy(LAWN_DARK).lerp(LAWN_LIGHT, t);
   }
@@ -817,7 +811,8 @@ export function mount(host, opts = {}) {
     pivot.position.x = -x0 * 0.15;
     const span = Math.max(W + gw, H + 2, Dp);
     sun.position.set(span * 0.9 + 4, H + 7.5, span * 0.35 + 5);
-    fill.position.set(-span - 4, H * 0.85 + 4, -span * 0.2 - 3);
+    // Behind and to the left, so the faces the sun misses still have shade.
+    fill.position.set(-span * 0.55 - 3, H + 6, -span - 6);
     sun.target.position.set(0, H * 0.35, 0);
     sun.target.updateMatrixWorld();
     Object.values(parts).forEach(applyClean);
