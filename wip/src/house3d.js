@@ -986,7 +986,7 @@ export function mount(host, opts = {}) {
   const VIEW = { az: 0.42, el: 0.37, sway: 0.26, swaySpeed: 0.2, fov: 30 };
   const phoneLayout = () => (window.innerWidth || host.clientWidth || 1200) < 960;
   const camFov = () => phoneLayout() ? 16 : VIEW.fov;
-  const viewLimit = () => phoneLayout() ? 0.97 : 0.84;
+  const viewLimit = () => phoneLayout() ? 0.86 : 0.84;
   const EL_MIN = 0.05, EL_MAX = 0.95;
   let yaw = 0, yawT = 0, velYaw = 0, el = VIEW.el, elT = VIEW.el, velEl = 0;
   let drag = null, lastInput = -1e9, idlePhase = 0, hold = false;
