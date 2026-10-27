@@ -867,12 +867,15 @@ export function mount(host, opts = {}) {
     plane.receiveShadow = false;
     plane.renderOrder = 6;
     plane.userData.frame = false;
-    const lift = dims[thin] / 2 + 0.008;
+    const lift = dims[thin] / 2 + 0.01;
     if (thin === 0) {
-      plane.rotation.y = Math.PI / 2;
-      plane.position.x = (Math.sign(mesh.position.x) || 1) * lift;
+      const s = Math.sign(mesh.position.x) || 1;
+      plane.rotation.y = s > 0 ? Math.PI / 2 : -Math.PI / 2;
+      plane.position.x = s * lift;
     } else {
-      plane.position.z = (Math.sign(mesh.position.z) || 1) * lift;
+      const s = Math.sign(mesh.position.z) || 1;
+      if (s < 0) plane.rotation.y = Math.PI;
+      plane.position.z = s * lift;
     }
     mesh.add(plane);
     return plane;
@@ -895,7 +898,7 @@ export function mount(host, opts = {}) {
         polygonOffsetUnits: -4,
         uniforms: { uT: { value: 0 }, uA: { value: 0 } },
         vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-        fragmentShader: 'varying vec2 vUv; uniform float uT; uniform float uA; void main(){ float y = vUv.y - (1.2 - uT * 1.55); float band = exp(-pow(y / 0.042, 2.0)); float side = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x); gl_FragColor = vec4(1.0, 1.0, 1.0, band * side * 0.22 * uA); }',
+        fragmentShader: 'varying vec2 vUv; uniform float uT; uniform float uA; void main(){ float y = vUv.y - (1.15 - uT * 1.45); float band = exp(-pow(y / 0.065, 2.0)); float side = smoothstep(0.0, 0.2, vUv.x) * smoothstep(1.0, 0.8, vUv.x); gl_FragColor = vec4(1.0, 1.0, 1.0, band * side * 0.5 * uA); }',
       });
       const planes = panes.map(mesh => glassShine(mesh, mat));
       fxList.push({ p, mode: 'glass', planes, shine: mat, t0: performance.now(), dur: 1300 });
