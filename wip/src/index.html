@@ -1879,6 +1879,9 @@ function ensureArabicFont() {
 }
 function settleLang() {
   if (!document.documentElement.classList.contains('lang-out')) return;
+  // Reduced motion has nothing to hide behind. Waiting on frames left the
+  // Arabic page blank if a screenshot landed first.
+  if (reduced) { document.documentElement.classList.remove('lang-out'); return; }
   requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove('lang-out')));
 }
 let langGhosts = [];

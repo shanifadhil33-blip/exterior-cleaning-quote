@@ -243,13 +243,15 @@ export function mount(host, opts = {}) {
     mesh.userData.p0 = mesh.position.clone();
     mesh.userData.s0 = mesh.scale.clone();
     mesh.userData.o0 = mesh.material.opacity;
-    mesh.userData.r = Math.random();
+    mesh.userData.r = noise();
     p.dirt.push(mesh);
     p.g.add(mesh);
   }
   function rnd(seed) {
     return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
   }
+  // Separate from the house seed so a wash does not move the walls.
+  let noise = rnd(1);
 
   function build(s) {
     spec = s;
@@ -259,6 +261,7 @@ export function mount(host, opts = {}) {
     pivot.add(root);
     parts = {}; fxList = [];
     const r = rnd(s.seed || 7);
+    noise = rnd((s.seed || 7) + 17);
     const C = {
       wall: '#f7f8f8', wallDirty: '#d2c4ac', roof: '#c5d0d6', roofDirty: '#746e58',
       glass: '#d5e4ec', glassDirty: '#c2b396', door: css('--h-door'), pave: '#dce2e3',
@@ -924,7 +927,7 @@ export function mount(host, opts = {}) {
     else sheet.scale.set(size.x + 0.2, 0.3, 1);
     root.add(sheet);
     const N = 70, pos = new Float32Array(N * 3), vel = [];
-    for (let i = 0; i < N; i++) vel.push(new THREE.Vector3((Math.random() - 0.5) * 1.4, Math.random() * 1.6 + 0.4, Math.random() * 1.2));
+    for (let i = 0; i < N; i++) vel.push(new THREE.Vector3((noise() - 0.5) * 1.4, noise() * 1.6 + 0.4, noise() * 1.2));
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const pts = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.06, transparent: true, opacity: 0.9, depthWrite: false }));
     root.add(pts);
@@ -999,7 +1002,7 @@ export function mount(host, opts = {}) {
   const viewLimit = () => phoneLayout() ? 0.86 : 0.84;
   const EL_MIN = 0.05, EL_MAX = 0.95;
   let yaw = 0, yawT = 0, velYaw = 0, el = VIEW.el, elT = VIEW.el, velEl = 0;
-  let drag = null, lastInput = -1e9, idlePhase = 0, hold = false;
+  let drag = null, lastInput = performance.now(), idlePhase = 0, hold = false;
   let sphere = null, dist = NaN, distV = 0;
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   function pick(x, y) {
@@ -1329,6 +1332,7 @@ export function mount(host, opts = {}) {
   const ro = new ResizeObserver(() => resize(true)); ro.observe(host);
 
   let visible = true, raf = 0, last = performance.now(), frames = [];
+  let drawn = '';
   const io = new IntersectionObserver(entries => {
     const was = visible;
     visible = entries.some(en => en.isIntersecting);
@@ -1389,7 +1393,15 @@ export function mount(host, opts = {}) {
       }
     }
     applyCamera(dist);
-    draw();
+    // The idle house does not change. Drawing it again only stalls the
+    // next frame on the GPU, which is what held a phone at about 30fps.
+    let cleanKey = '';
+    for (const id in parts) cleanKey += parts[id].clean.toFixed(4);
+    const picture = [
+      yaw.toFixed(4), el.toFixed(4), (Number.isNaN(dist) ? 0 : dist).toFixed(3),
+      canvas.width, canvas.height, bgCur.getHexString(), fxList.length, shadowDirty ? 1 : 0, cleanKey,
+    ].join('|');
+    if (picture !== drawn) { drawn = picture; draw(); }
   }
   raf = requestAnimationFrame(loop);
 
@@ -1449,7 +1461,7 @@ export function mount(host, opts = {}) {
     },
     view() { return { az: VIEW.az - yaw, el, dist }; },
     coverage() { return projectSpan(0.92); },
-    settleFps() { frames.length = 0; },
+    settleFps() { frames.length = 0; lastInput = performance.now(); },
     msaa: () => msaa,
     pixelRatio: () => renderer.getPixelRatio(),
     paintBackdrop,
