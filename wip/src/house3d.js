@@ -99,9 +99,11 @@ export function mount(host, opts = {}) {
     const t = themeMix();
     hemi.color.set(0xffffff);
     hemi.groundColor.set(0x262626);
-    hemi.intensity = 0.78 * PI;
+    // Kept under the old level so a clean wall stays a shaded off-white,
+    // not a flat clipped white.
+    hemi.intensity = 0.48 * PI;
     sun.color.set(0xffffff);
-    sun.intensity = 0.5 * PI;
+    sun.intensity = 0.34 * PI;
     fill.color.set(0xffffff);
     fill.intensity = 0.3 * PI;
     contactU.value = 0.40 + (0.22 - 0.40) * t;
@@ -903,7 +905,7 @@ export function mount(host, opts = {}) {
         polygonOffsetUnits: -4,
         uniforms: { uT: { value: 0 }, uA: { value: 0 } },
         vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-        fragmentShader: 'varying vec2 vUv; uniform float uT; uniform float uA; void main(){ float y = vUv.y - (1.15 - uT * 1.45); float band = exp(-pow(y / 0.065, 2.0)); float side = smoothstep(0.0, 0.2, vUv.x) * smoothstep(1.0, 0.8, vUv.x); gl_FragColor = vec4(1.0, 1.0, 1.0, band * side * 0.5 * uA); }',
+        fragmentShader: 'varying vec2 vUv; uniform float uT; uniform float uA; void main(){ float diag = vUv.x * 0.85 + vUv.y * 0.55; float head = mix(1.35, -0.25, uT); float band = exp(-pow((diag - head) / 0.035, 2.0)); float inset = smoothstep(0.0, 0.08, vUv.x) * smoothstep(1.0, 0.92, vUv.x) * smoothstep(0.0, 0.08, vUv.y) * smoothstep(1.0, 0.92, vUv.y); gl_FragColor = vec4(1.0, 1.0, 1.0, band * inset * 0.32 * uA); }',
       });
       const planes = panes.map(mesh => glassShine(mesh, mat));
       fxList.push({ p, mode: 'glass', planes, shine: mat, t0: performance.now(), dur: 1300 });
@@ -945,13 +947,12 @@ export function mount(host, opts = {}) {
         return false;
       }
       const a = Math.sin(Math.PI * Math.min(1, t * 1.2));
-      f.sheet.material.opacity = 0.55 * a;
+      // A faint streak only. The colour change itself is the 520ms fade.
+      f.sheet.material.opacity = 0.12 * a;
       let lx, ly, lz;
       if (f.horiz) { lx = f.bb.min.x + (f.size.x + 0.4) * t - 0.2; ly = f.bb.max.y + 0.03; lz = f.ctr.z; }
       else { lx = f.ctr.x; ly = f.bb.max.y - (f.size.y + 0.2) * t; lz = f.bb.max.z + 0.05; }
       f.sheet.position.set(lx, ly, lz);
-      const glow = 0.28 * a;
-      f.p.mats.forEach(m => m.emissive && m.emissive.setScalar(glow));
       const arr = f.pts.geometry.attributes.position.array;
       for (let i = 0; i < f.vel.length; i++) {
         const age = Math.max(0, t * 1.3 - (i / f.vel.length) * 0.5), v = f.vel[i];
