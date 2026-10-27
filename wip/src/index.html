@@ -25,26 +25,44 @@
     var langAr = localStorage.getItem('gleam.lang') === 'ar' || /(?:^|[?&])lang=ar(?:&|$)/.test(location.search);
     if (langAr && /\/sa\/?$/.test(location.pathname)) root.classList.add('lang-out');
   } catch (e2) {}
+  var flat = false;
+  try { flat = new URLSearchParams(location.search).has('flat'); } catch (e3) {}
+  if (!flat) root.classList.add('gl-wait');
 })();
 </script>
+<style id="bootPaint">html,body{background:#ECEEEE;color:#1D2125}html[data-theme="dark"],html[data-theme="dark"] body{background:#121618;color:#F4F6F7}</style>
 <title>Gleam | Instant exterior cleaning quote</title>
 <meta name="description" content="Build your exterior cleaning quote on your own home and book it by text or WhatsApp.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231D2125'/%3E%3Cpath d='M6 23l7.5-12 4.2 6.4 2.8-3.8L26 23' fill='none' stroke='%23F9FAFA' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" } }
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..800&display=swap">
+<link rel="preload" href="https://fonts.gstatic.com/s/schibstedgrotesk/v7/Jqz55SSPQuCQF3t8uOwiUL-taUTtap9Gayo.woff2" as="font" type="font/woff2" crossorigin>
+<style id="bootFont">
+@font-face{font-family:"Schibsted Grotesk Fallback";src:local("Arial"),local("Liberation Sans"),local("Helvetica"),local("Nimbus Sans"),local("DejaVu Sans"),local("Noto Sans");font-style:normal;font-weight:100 900;size-adjust:112.91%;ascent-override:86.49%;descent-override:22.83%;line-gap-override:0%}
+@font-face{font-family:"Schibsted Grotesk";font-style:normal;font-weight:400 800;font-display:optional;src:url("https://fonts.gstatic.com/s/schibstedgrotesk/v7/Jqz55SSPQuCQF3t8uOwiUL-taUTtap9Gayo.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Schibsted Grotesk";font-style:normal;font-weight:400 800;font-display:optional;src:url("https://fonts.gstatic.com/s/schibstedgrotesk/v7/Jqz55SSPQuCQF3t8uOwiUL-taUTtap9Iayoxdg.woff2") format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+</style>
 <script>
-if (/\/sa\/?$/.test(location.pathname)) {
-  [400, 500, 600, 700].forEach(function (w) {
-    var l = document.createElement('link');
-    l.rel = 'preload'; l.as = 'font'; l.type = 'font/woff2'; l.crossOrigin = 'anonymous';
-    l.href = '/fonts/ibm-plex-sans-arabic-' + w + '.woff2';
-    document.head.appendChild(l);
-  });
-}
+(function () {
+  var base = location.pathname.replace(/(us|uk|ie|ca|au|sa|nz)\/?(index\.html)?$/i, '').replace(/index\.html$/i, '').replace(/[^/]*$/, '');
+  var range = 'U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1';
+  var css = [400, 500, 600, 700].map(function (w) {
+    return '@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:' + w + ';font-display:optional;src:url("' + base + 'fonts/ibm-plex-sans-arabic-' + w + '.woff2") format("woff2");unicode-range:' + range + '}';
+  }).join('');
+  var style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+  if (/\/sa\/?$/.test(location.pathname)) {
+    [400, 500, 600, 700].forEach(function (w) {
+      var l = document.createElement('link');
+      l.rel = 'preload'; l.as = 'font'; l.type = 'font/woff2'; l.crossOrigin = 'anonymous';
+      l.href = base + 'fonts/ibm-plex-sans-arabic-' + w + '.woff2';
+      document.head.appendChild(l);
+    });
+  }
+})();
 </script>
 <style>
 @property --bg { syntax: "<color>"; inherits: true; initial-value: #ECEEEE; }
@@ -58,13 +76,9 @@ if (/\/sa\/?$/.test(location.pathname)) {
 @property --thumb { syntax: "<color>"; inherits: true; initial-value: #F9FAFA; }
 @property --on-ink { syntax: "<color>"; inherits: true; initial-value: #F9FAFA; }
 @property --stage { syntax: "<color>"; inherits: true; initial-value: #E2E6E7; }
-@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:400;font-display:optional;src:url("/fonts/ibm-plex-sans-arabic-400.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
-@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:500;font-display:optional;src:url("/fonts/ibm-plex-sans-arabic-500.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
-@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:600;font-display:optional;src:url("/fonts/ibm-plex-sans-arabic-600.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
-@font-face{font-family:"IBM Plex Sans Arabic";font-style:normal;font-weight:700;font-display:optional;src:url("/fonts/ibm-plex-sans-arabic-700.woff2") format("woff2");unicode-range:U+0600-06FF,U+0750-077F,U+0870-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC7,U+10EC9-10EEE,U+10EF0-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1}
 :root{
   color-scheme: only light;
-  --sans:"Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --sans:"Schibsted Grotesk", "Schibsted Grotesk Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --ease:cubic-bezier(.2,.7,.2,1);
 
   /* washed concrete, rinse white, wet slate */
@@ -102,14 +116,13 @@ if (/\/sa\/?$/.test(location.pathname)) {
   --h-streak:#2B2822;
   --h-moss:#A49E86;
   --h-leaf:#857B63;
-  --h-tree:#C9D0D2;
-  --h-shrub:#BDC5C7;
+  --h-tree:#4E6B38;
+  --h-shrub:#6D8B4A;
   --h-sweep:#FFFFFF;
   --h-panel:#3E474D;
   --h-cell:rgba(255,255,255,.22);
 }
 html[data-theme="dark"]{
-  color-scheme: only dark;
   --bg:#121618;
   --surface:#1C2126;
   --sel:#262C31;
@@ -128,12 +141,14 @@ html[data-theme="dark"]{
 .top,.hero,.stage-foot,.block,.foot{transition:opacity .18s ease}
 html.lang-out .top:not(.lang-ghost),html.lang-out .hero:not(.lang-ghost),html.lang-out .stage-foot:not(.lang-ghost),html.lang-out .block:not(.lang-ghost),html.lang-out .foot:not(.lang-ghost),html.lang-out .bar:not(.lang-ghost){opacity:0}
 html.lang-swap:not(.lang-in) .top:not(.lang-ghost),html.lang-swap:not(.lang-in) .hero:not(.lang-ghost),html.lang-swap:not(.lang-in) .stage-foot:not(.lang-ghost),html.lang-swap:not(.lang-in) .right:not(.lang-ghost),html.lang-swap:not(.lang-in) .left > .block:not(.lang-ghost),html.lang-swap:not(.lang-in) .foot:not(.lang-ghost),html.lang-swap:not(.lang-in) .bar:not(.lang-ghost){opacity:0;transition:none}
-html.lang-in .top:not(.lang-ghost),html.lang-in .hero:not(.lang-ghost),html.lang-in .stage-foot:not(.lang-ghost),html.lang-in .right:not(.lang-ghost),html.lang-in .left > .block:not(.lang-ghost),html.lang-in .foot:not(.lang-ghost),html.lang-in .bar:not(.lang-ghost){opacity:1;transition:opacity .24s ease}
+html.lang-in .top:not(.lang-ghost),html.lang-in .hero:not(.lang-ghost),html.lang-in .stage-foot:not(.lang-ghost),html.lang-in .right:not(.lang-ghost),html.lang-in .left > .block:not(.lang-ghost),html.lang-in .foot:not(.lang-ghost),html.lang-in .bar:not(.lang-ghost){opacity:1}
 .lang-ghost{pointer-events:none}
 #langSw button[data-lang="ar"]{font-family:"IBM Plex Sans Arabic",var(--sans)}
 html:not(.ar-font) #langSw button[data-lang="ar"]{visibility:hidden}
 
-*,*::before,*::after{box-sizing:border-box}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:focus:not(:focus-visible){outline:none}
+:focus-visible{outline:2px solid var(--ring);outline-offset:3px}
 html{color-scheme:only light;background-color:#ECEEEE;background-color:var(--bg);color:#1D2125;color:var(--ink);-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 12px)}
 body{margin:0;background-color:#ECEEEE;background-color:var(--bg);color:#1D2125;color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:#ECEEEE;background:var(--bg);z-index:50}
@@ -141,8 +156,7 @@ h1,h2,p{margin:0}
 button,input,select{font:inherit;color:inherit;letter-spacing:inherit}
 input,select,textarea{background-color:#F9FAFA;background-color:var(--surface);color:#1D2125;color:var(--ink);color-scheme:only light}
 html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{color-scheme:only dark}
-button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+button{cursor:pointer;touch-action:manipulation}
 .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 .page{max-width:1200px;margin:0 auto;padding:0 20px calc(128px + env(safe-area-inset-bottom,0px))}
@@ -153,12 +167,20 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .brand{display:inline-flex;align-items:center;gap:10px;color:inherit;text-decoration:none;font-weight:650;font-size:17px;letter-spacing:-.015em}
 .mark{width:34px;height:34px;border-radius:11px;background:var(--ink);color:var(--on-ink);display:grid;place-items:center}
 .region{position:relative;display:inline-flex}
-.region select{appearance:none;-webkit-appearance:none;height:36px;padding-block:0;padding-inline:14px 32px;border:1px solid var(--line-2);border-radius:999px;background-color:#F9FAFA;background-color:var(--surface);color:var(--ink);font-size:14px;font-weight:550;cursor:pointer}
+.region-btn{appearance:none;-webkit-appearance:none;height:36px;padding-block:0;padding-inline:14px 32px;border:1px solid var(--line-2);border-radius:999px;background-color:#F9FAFA;background-color:var(--surface);color:var(--ink);font-size:14px;font-weight:550;cursor:pointer}
 .region::after{content:"";position:absolute;inset-inline-end:14px;top:50%;width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.native-select{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;pointer-events:none}
+.native-select:focus,.native-select:focus-visible{outline:none;box-shadow:none}
+.pick-pop{position:fixed;z-index:80;min-width:180px;max-width:min(320px,calc(100vw - 16px));margin:0;padding:6px;border:1px solid var(--line-2);border-radius:16px;background:var(--surface);color:var(--ink);box-shadow:0 18px 40px -28px rgba(29,33,37,.55);overflow:auto;overscroll-behavior:contain}
+.pick-pop[hidden]{display:none}
+.pick-pop button{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;min-height:42px;padding:8px 12px;border:0;border-radius:10px;background:transparent;color:var(--ink);font-size:15px;font-weight:550;text-align:start;cursor:pointer}
+.pick-pop button[aria-selected="true"]{background:var(--sel)}
+.pick-pop button .tick{width:16px;height:16px;flex:none;display:grid;place-items:center}
+.pick-pop button:focus-visible{outline:2px solid var(--ring);outline-offset:0}
 
 /* hero */
 .hero{padding:26px 0 16px}
-.hero h1{font-size:clamp(30px,8.2vw,58px);line-height:1.02;letter-spacing:-.04em;font-weight:650;max-width:13ch;text-wrap:balance}
+.hero h1{font-size:clamp(30px,8.2vw,58px);line-height:1.02;letter-spacing:-.04em;font-weight:650;font-synthesis:none;max-width:13.2ch;text-wrap:balance}
 .hero p{margin-top:12px;color:var(--muted);max-width:38ch;text-wrap:pretty}
 
 /* layout */
@@ -167,11 +189,10 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 /* stage */
 .stage-wrap{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;margin:0 -20px;padding:6px 20px 14px;background:linear-gradient(var(--bg) calc(100% - 16px),transparent);transition:transform .5s var(--ease),opacity .35s ease}
 .stage-wrap.away{transform:translateY(calc(-100% - 24px));opacity:0;pointer-events:none}
-.stage{background:var(--stage);border-radius:32px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line),0 26px 40px -32px rgba(29,33,37,.5)}
+.stage{background-color:#ECEEEE;background-color:var(--bg);border:0;border-radius:0;overflow:visible;box-shadow:none}
 .house{display:block;width:100%;height:auto;max-height:38vh;max-height:38svh;margin:0 auto;padding-top:8px;overflow:visible;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
 .stage-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px 14px;min-height:44px}
-.caption{font-size:14px;font-weight:500;color:var(--ink-2);transition:opacity .2s ease,transform .2s ease;min-width:0;line-height:1.35;min-height:2.8em;display:flex;align-items:center;transform:translateY(0)}
-.caption.swap{opacity:0;transform:translateY(5px)}
+.caption{font-size:14px;font-weight:500;color:var(--ink-2);min-width:0;line-height:1.35;min-height:2.8em;display:flex;align-items:center}
 .stage-est{display:none;align-items:baseline;gap:10px;white-space:nowrap}
 .stage-est>span{font-size:13px;color:var(--muted)}
 .stage-est strong{font-size:22px;font-weight:650;letter-spacing:-.03em;font-variant-numeric:tabular-nums;transition:color .3s}
@@ -267,6 +288,10 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .chk svg{opacity:0;transform:scale(.5);transition:opacity .25s,transform .35s var(--ease)}
 .svc.on .chk{background:var(--ink);border-color:var(--ink)}
 .svc.on .chk svg{opacity:1;transform:none}
+@media (max-width:959px){
+  .stage-wrap{padding-inline:0}
+  .svc-main,.seg button,.day,.chip,#sumBtn,#locBtn,.svc{scroll-margin-top:min(470px,58vh);scroll-margin-bottom:110px}
+}
 .opt-wrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s var(--ease)}
 .svc.on .opt-wrap{grid-template-rows:1fr}
 .opt-in{overflow:hidden;min-height:0}
@@ -282,12 +307,13 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 .field span{display:block;margin:0 0 7px 2px;font-size:14px;font-weight:550;color:var(--ink-2)}
 .input{display:block;width:100%;height:54px;padding:0 16px;border:1px solid var(--line-2);border-radius:14px;background-color:#F9FAFA;background-color:var(--surface);color:var(--ink);font-size:16px;outline:none;-webkit-appearance:none;appearance:none;transition:border-color .2s,box-shadow .2s}
 .input::placeholder{color:var(--faint)}
-.input:focus{border-color:var(--ink);box-shadow:0 0 0 4px var(--ring)}
+.input:focus{outline:none;box-shadow:none}
+html.kbd .input:focus{border-color:var(--ink);box-shadow:0 0 0 4px var(--ring)}
 .tel{display:flex;gap:8px}
 .cc{position:relative;flex:none;display:flex;align-items:center;gap:6px;height:54px;padding:0 30px 0 14px;border:1px solid var(--line-2);border-radius:14px;background-color:#F9FAFA;background-color:var(--surface);color:var(--ink);font-size:16px;font-weight:550;white-space:nowrap;transition:border-color .2s,box-shadow .2s}
 .cc::after{content:"";position:absolute;inset-inline-end:13px;top:50%;width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:translateY(-70%) rotate(45deg);pointer-events:none}
-.cc select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px;-webkit-appearance:none;appearance:none}
-.cc:focus-within{border-color:var(--ink);box-shadow:0 0 0 4px var(--ring)}
+.cc-btn{position:absolute;inset:0;width:100%;height:100%;padding:0;border:0;border-radius:inherit;background:transparent;cursor:pointer}
+.cc:has(.cc-btn:focus-visible){border-color:var(--ink);box-shadow:0 0 0 4px var(--ring)}
 .tel .input{flex:1;min-width:0}
 .hint{margin:7px 0 0 2px;font-size:13px;color:var(--muted)}
 .hint:empty{display:none}
@@ -424,7 +450,7 @@ html[data-theme="dark"] .theme .moon{opacity:1;transform:none}
   .brand{gap:8px;font-size:16px}
   .lang{padding:2px}
   .lang button{min-width:32px;padding:0 8px}
-  .region select{padding-inline:10px 26px;font-size:13px}
+  .region-btn{padding-inline:10px 26px;font-size:13px}
   .theme{width:32px;height:32px}
 }
 [dir="rtl"] body{font-family:"IBM Plex Sans Arabic",var(--sans)}
@@ -435,15 +461,14 @@ html[data-theme="dark"] .theme .moon{opacity:1;transform:none}
 [dir="rtl"] .opts{padding:0 72px 16px 16px}
 [dir="rtl"] .h2,[dir="rtl"] .bar-amt,[dir="rtl"] .stage-est strong{letter-spacing:0}
 /* 3D house */
-.stage{position:relative}
-.gl3{position:relative;width:100%;display:block;touch-action:pan-y;-webkit-tap-highlight-color:transparent;outline:none;cursor:grab;background-color:#E2E6E7;background-color:var(--stage);color-scheme:only light;opacity:0}
-html[data-theme="dark"] .stage{box-shadow:inset 0 0 0 1px rgba(244,246,247,.16), 0 18px 36px -20px rgba(0,0,0,.72)}
-html[data-theme="dark"] .caption{align-self:center;width:fit-content;max-width:100%;padding:6px 12px;border-radius:999px;background:rgba(244,246,247,.10)}
-html[data-theme="dark"] .gl3{color-scheme:only light}
+.stage{position:relative;container-type:inline-size}
+html.gl-wait .house{visibility:hidden;height:min(calc(100cqi / 1.12),74svh);max-height:none;padding-top:0}
+@media (max-width:959px){html.gl-wait .house{height:min(calc(100cqi / 1.18),48svh)}}
+.gl3{position:absolute;left:0;right:0;top:0;width:100%;display:block;touch-action:pan-y;outline:none;cursor:grab;background-color:#ECEEEE;background-color:var(--bg);opacity:0;pointer-events:none}
 .gl3:active{cursor:grabbing}
-.stage.gl-on .house{display:none}
-.stage.gl-on .gl3{animation:glIn .6s var(--ease) both}
-@keyframes glIn{from{opacity:0}to{opacity:1}}
+.stage.gl-on .house{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;pointer-events:none}
+.stage.gl-on .gl3{position:relative;pointer-events:auto}
+.stage.gl-show .gl3{opacity:1}
 </style>
 </head>
 <body>
@@ -456,7 +481,7 @@ html[data-theme="dark"] .gl3{color-scheme:only light}
     <div class="top-r">
       <div class="lang" id="langSw" role="group" aria-label="Language" hidden><button type="button" data-lang="en" lang="en" aria-pressed="false">EN</button><button type="button" data-lang="ar" lang="ar" aria-pressed="false">العربية</button></div>
       <button type="button" class="theme" id="themeBtn" aria-pressed="false" aria-label="Switch to dark theme"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.6"/><path d="M12 3.2v1.8M12 19v1.8M3.2 12h1.8M19 12h1.8M6.1 6.1l1.3 1.3M16.6 16.6l1.3 1.3M17.9 6.1l-1.3 1.3M7.4 16.6l-1.3 1.3"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.2 14.2A6.2 6.2 0 0 1 9.4 5.2 6.8 6.8 0 1 0 16.2 14.2z"/></svg></button>
-      <label class="region"><span class="sr">Region and currency</span><select id="region"></select></label>
+      <div class="region"><span class="sr" id="regionLbl">Region and currency</span><select id="region" class="native-select" tabindex="-1" aria-hidden="true"></select><button type="button" class="region-btn" id="regionBtn" aria-haspopup="listbox" aria-expanded="false"></button></div>
     </div>
   </header>
 
@@ -493,7 +518,7 @@ html[data-theme="dark"] .gl3{color-scheme:only light}
         <h2 class="h2" id="hDet">Your details</h2>
         <div class="fields">
           <label class="field"><span id="nameLbl">Your name</span><input class="input" id="name" type="text" autocomplete="given-name" placeholder="First name is fine" maxlength="60"></label>
-          <div class="field"><span id="hPhone">Mobile number</span><div class="tel"><label class="cc"><span id="ccShow"></span><select id="cc" aria-label="Country code"></select></label><input class="input" id="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Mobile number" maxlength="20" aria-labelledby="hPhone"></div><p class="hint" id="phoneHint" aria-live="polite"></p></div>
+          <div class="field"><span id="hPhone">Mobile number</span><div class="tel"><div class="cc"><span id="ccShow"></span><select id="cc" class="native-select" tabindex="-1" aria-hidden="true"></select><button type="button" class="cc-btn" id="ccBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Country code"></button></div><input class="input" id="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Mobile number" maxlength="20" aria-labelledby="hPhone"></div><p class="hint" id="phoneHint" aria-live="polite"></p></div>
         </div>
         <p class="label" id="hDay">Preferred day</p>
         <div class="days" id="days" role="group" aria-labelledby="hDay"></div>
@@ -786,6 +811,8 @@ IDS.forEach(id => { state.sel[id] = false; });
 const $ = s => document.querySelector(s);
 const NS = 'http://www.w3.org/2000/svg';
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+addEventListener('keydown', e => { if (e.key === 'Tab') document.documentElement.classList.add('kbd'); }, true);
+addEventListener('pointerdown', () => document.documentElement.classList.remove('kbd'), true);
 const desktop = matchMedia('(min-width: 960px)');
 const R = () => CONFIG.regions[state.region];
 const svcName = id => tr(SERVICES.find(s => s.id === id).name);
@@ -801,8 +828,123 @@ const tiles = $('#tiles'), mapBg = $('#mapBg'), osm = $('#osm');
 const lines = $('#lines'), sumAmt = $('#sumAmt'), sumBtn = $('#sumBtn'), statusEl = $('#status');
 const stageWrap = $('#stageWrap'), stageEst = $('#stageEst'), stageAmt = $('#stageAmt');
 const bar = $('#bar'), barAmt = $('#barAmt'), barSub = $('#barSub'), barBtn = $('#barBtn');
-const detailsEl = $('#details'), regionSel = $('#region');
-const ccSel = $('#cc'), ccShow = $('#ccShow'), heroP = $('#heroP'), noteEl = $('#note');
+const detailsEl = $('#details'), regionSel = $('#region'), regionBtn = $('#regionBtn');
+const ccSel = $('#cc'), ccShow = $('#ccShow'), ccBtn = $('#ccBtn'), heroP = $('#heroP'), noteEl = $('#note');
+const pickPop = document.createElement('div');
+pickPop.className = 'pick-pop';
+pickPop.setAttribute('role', 'listbox');
+pickPop.hidden = true;
+document.body.appendChild(pickPop);
+let pickOpen = null;
+function placePick(btn) {
+  const r = btn.getBoundingClientRect();
+  pickPop.hidden = false;
+  pickPop.style.visibility = 'hidden';
+  pickPop.style.maxHeight = Math.round(window.innerHeight * 0.55) + 'px';
+  pickPop.style.minWidth = Math.max(180, r.width) + 'px';
+  const width = pickPop.offsetWidth;
+  const height = pickPop.offsetHeight;
+  let left = document.documentElement.dir === 'rtl' ? r.right - width : r.left;
+  if (left + width > window.innerWidth - 8) left = window.innerWidth - 8 - width;
+  if (left < 8) left = 8;
+  let top = r.bottom + 6;
+  if (top + height > window.innerHeight - 8 && r.top - 6 - height > 8) top = r.top - 6 - height;
+  if (top < 8) top = 8;
+  const room = window.innerHeight - top - 8;
+  if (height > room) pickPop.style.maxHeight = Math.max(120, room) + 'px';
+  pickPop.style.left = left + 'px';
+  pickPop.style.top = top + 'px';
+  pickPop.style.visibility = '';
+}
+function closePick(focusBack) {
+  if (!pickOpen) { pickPop.hidden = true; return; }
+  const btn = pickOpen.btn;
+  pickOpen.btn.setAttribute('aria-expanded', 'false');
+  pickPop.hidden = true;
+  pickPop.innerHTML = '';
+  pickOpen = null;
+  if (focusBack) btn.focus();
+}
+function paintPick(index) {
+  if (!pickOpen) return;
+  const opts = [...pickOpen.select.options];
+  pickPop.innerHTML = opts.map((o, i) => `<button type="button" role="option" data-i="${i}" aria-selected="${i === index ? 'true' : 'false'}">${o.textContent}<span class="tick">${i === index ? CHECK : ''}</span></button>`).join('');
+  pickOpen.index = index;
+}
+function openPick(btn, select) {
+  if (pickOpen && pickOpen.btn === btn) { closePick(false); return; }
+  closePick(false);
+  pickOpen = { btn, select, index: select.selectedIndex };
+  btn.setAttribute('aria-expanded', 'true');
+  pickPop.id = btn.id + 'List';
+  btn.setAttribute('aria-controls', pickPop.id);
+  paintPick(Math.max(0, select.selectedIndex));
+  placePick(btn);
+  const cur = pickPop.querySelector('[aria-selected="true"]');
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+}
+function movePick(delta) {
+  if (!pickOpen) return;
+  const n = pickOpen.select.options.length;
+  if (!n) return;
+  const i = (pickOpen.index + delta + n) % n;
+  paintPick(i);
+  const cur = pickPop.querySelector('[aria-selected="true"]');
+  if (cur) { cur.focus(); cur.scrollIntoView({ block: 'nearest' }); }
+}
+function choosePick(i) {
+  if (!pickOpen) return;
+  const sel = pickOpen.select;
+  const btn = pickOpen.btn;
+  sel.selectedIndex = i;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  closePick(false);
+  btn.focus();
+}
+function bindPick(btn, select) {
+  btn.addEventListener('click', () => openPick(btn, select));
+  btn.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!pickOpen || pickOpen.btn !== btn) openPick(btn, select);
+      movePick(e.key === 'ArrowDown' ? 1 : -1);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (pickOpen && pickOpen.btn === btn) choosePick(pickOpen.index);
+      else openPick(btn, select);
+    }
+  });
+}
+pickPop.addEventListener('click', e => {
+  const b = e.target.closest('button[data-i]');
+  if (!b) return;
+  choosePick(Number(b.dataset.i));
+});
+pickPop.addEventListener('keydown', e => {
+  if (!pickOpen) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); movePick(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); movePick(-1); }
+  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choosePick(pickOpen.index); }
+  else if (e.key === 'Escape') { e.preventDefault(); closePick(true); }
+  else if (e.key === 'Tab') closePick(false);
+});
+document.addEventListener('pointerdown', e => {
+  if (!pickOpen) return;
+  if (pickPop.contains(e.target) || pickOpen.btn.contains(e.target)) return;
+  closePick(false);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && pickOpen) { e.preventDefault(); closePick(true); }
+});
+window.addEventListener('resize', () => { if (pickOpen) placePick(pickOpen.btn); });
+window.addEventListener('scroll', () => { if (pickOpen) placePick(pickOpen.btn); }, true);
+bindPick(regionBtn, regionSel);
+bindPick(ccBtn, ccSel);
+function syncRegionBtn() {
+  const o = regionSel.selectedOptions[0];
+  regionBtn.textContent = o ? o.textContent : '';
+  regionBtn.setAttribute('aria-label', (document.getElementById('regionLbl').textContent || '') + ' ' + regionBtn.textContent);
+}
 const BK = () => COPY[R().booking] || COPY.whatsapp;
 
 /* ---------- money and totals ---------- */
@@ -1096,8 +1238,31 @@ function load3d() {
     H3.setSel(state.sel);
     H3.build(spec3d());
     stage.classList.add('gl-on');
+    document.documentElement.classList.remove('gl-wait');
     window.__h3d = H3;
-  }).catch(err => { H3 = null; window.__h3dError = String(err && err.message || err); });
+    // The first presented WebGL frame is a long GPU hitch. Hold the canvas
+    // almost invisible through that, then fade it in over 300ms.
+    const canvas = H3.canvas;
+    const dur = reduced ? 1 : 300;
+    canvas.style.opacity = '0.001';
+    let warm = 3;
+    const start = () => {
+      if (warm-- > 0) { requestAnimationFrame(start); return; }
+      const t0 = performance.now();
+      const step = now => {
+        const u = Math.min(1, (now - t0) / dur);
+        canvas.style.opacity = String(0.001 + 0.999 * u);
+        if (u < 1) requestAnimationFrame(step);
+        else {
+          stage.classList.add('gl-show');
+          canvas.style.opacity = '';
+          if (H3.settleFps) H3.settleFps();
+        }
+      };
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(start);
+  }).catch(err => { H3 = null; document.documentElement.classList.remove('gl-wait'); window.__h3dError = String(err && err.message || err); });
 }
 function renderHouse(animate) {
   if (H3) H3.build(spec3d());
@@ -1131,30 +1296,61 @@ function ripple(e) {
 }
 
 /* ---------- caption ---------- */
-let sayT, swapT, swapGen = 0, captionShown = false, langFading = false;
+let sayT, capGen = 0, captionShown = false, langFading = false;
+function captionOpacity() {
+  const n = parseFloat(getComputedStyle(caption).opacity);
+  return Number.isFinite(n) ? n : 1;
+}
+// Cancel without letting the caption fall back to opacity 1 for a frame.
+function commitCaptionOpacity() {
+  const o = captionOpacity();
+  const written = String(o);
+  caption.style.opacity = written;
+  void caption.offsetWidth;
+  for (const a of caption.getAnimations()) {
+    a.onfinish = null;
+    a.oncancel = null;
+    a.cancel();
+  }
+  caption.style.opacity = written;
+  return o;
+}
 function setCaption(msg) {
-  if (!captionShown || langFading) {
+  const token = ++capGen;
+  if (langFading) {
+    // Text only. Opacity stays where the footer fade left it, and is parked
+    // at 1 later, while the footer is fully hidden.
     caption.textContent = msg;
-    caption.classList.remove('swap');
     captionShown = true;
-    clearTimeout(swapT);
-    swapGen++;
     return;
   }
-  if (caption.textContent === msg && !caption.classList.contains('swap')) return;
-  caption.classList.add('swap');
-  clearTimeout(swapT);
-  const token = ++swapGen;
-  swapT = setTimeout(() => {
-    if (token !== swapGen) return;
+  const o = captionShown ? commitCaptionOpacity() : 1;
+  if (!captionShown || reduced) {
     caption.textContent = msg;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (token !== swapGen) return;
-        caption.classList.remove('swap');
-      });
-    });
-  }, 200);
+    caption.style.opacity = '1';
+    captionShown = true;
+    return;
+  }
+  if (caption.textContent === msg && o > 0.98) return;
+  const out = caption.animate(
+    [{ opacity: o }, { opacity: 0 }],
+    { duration: Math.max(70, Math.round(180 * o)), easing: 'ease', fill: 'forwards' }
+  );
+  out.onfinish = () => {
+    if (token !== capGen) return;
+    caption.textContent = msg;
+    caption.style.opacity = '0';
+    const inn = caption.animate(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: 180, easing: 'ease', fill: 'forwards' }
+    );
+    inn.onfinish = () => {
+      if (token !== capGen) return;
+      caption.style.opacity = '1';
+      inn.cancel();
+      caption.style.opacity = '1';
+    };
+  };
 }
 function say(msg) {
   setCaption(msg);
@@ -1169,6 +1365,8 @@ function say(msg) {
 function renderRegions() {
   regionSel.innerHTML = Object.entries(CONFIG.regions).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
   regionSel.value = state.region;
+  syncRegionBtn();
+  if (pickOpen && pickOpen.select === regionSel) closePick(false);
 }
 function renderSizes() {
   sizeSeg.style.setProperty('--n', sizeKeys().length);
@@ -1592,12 +1790,14 @@ function renderCountries() {
   if (!state.ccTouched) state.cc = own;
   ccSel.value = state.cc;
   showCc();
+  if (pickOpen && pickOpen.select === ccSel) closePick(false);
 }
 function showCc() { const c = country(state.cc); ccShow.textContent = `${c[3]} ${c[2]}`; }
 ccSel.addEventListener('change', () => { state.cc = ccSel.value; state.ccTouched = true; showCc(); update(); });
 
 regionSel.addEventListener('change', () => {
   state.region = regionSel.value;
+  syncRegionBtn();
   if (!sizeKeys().includes(state.size)) { state.size = swapSize(state.size); renderHouse(true); }
   if (/\/(us|uk|ie|ca|au|sa|nz)\/?$/i.test(location.pathname) || location.search) {
     try { history.replaceState(null, '', SITE_BASE + state.region.toLowerCase() + '/'); } catch (_) { /* ignore */ }
@@ -1700,10 +1900,14 @@ function freezePaint(src, dst) {
     else o.value = el.value;
   });
 }
+function langFadeEls() {
+  return [document.querySelector('.top'), document.querySelector('.hero'), document.querySelector('.stage-foot'), document.querySelector('.left > .block'), document.querySelector('.right'), document.querySelector('.foot'), document.querySelector('.bar')].filter(Boolean);
+}
 function clearLangGhosts() {
   for (const g of langGhosts) g.remove();
   langGhosts = [];
   document.documentElement.classList.remove('lang-swap', 'lang-in');
+  for (const el of langFadeEls()) el.style.transition = '';
 }
 function snapshotLang() {
   const ghosts = [];
@@ -1744,19 +1948,30 @@ function crossfadeLang(token) {
   const root = document.documentElement;
   const ghosts = snapshotLang();
   langGhosts = ghosts;
+  commitCaptionOpacity();
   root.classList.remove('lang-out');
   root.classList.add('lang-swap');
   langFading = true;
   try { paintLang(); } finally { langFading = false; }
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  // Put the transition on while opacity is still 0. Changing both in one
+  // frame paints the caption at full strength for that frame.
+  requestAnimationFrame(() => {
     if (token !== langGen) return;
-    root.classList.add('lang-in');
-    for (const g of ghosts) g.style.opacity = '0';
-    setTimeout(() => {
+    for (const el of langFadeEls()) {
+      if (!el.classList.contains('lang-ghost')) el.style.transition = 'opacity .24s ease';
+    }
+    void document.body.offsetWidth;
+    requestAnimationFrame(() => {
       if (token !== langGen) return;
-      clearLangGhosts();
-    }, 280);
-  }));
+      caption.style.opacity = '1';
+      root.classList.add('lang-in');
+      for (const g of ghosts) g.style.opacity = '0';
+      setTimeout(() => {
+        if (token !== langGen) return;
+        clearLangGhosts();
+      }, 280);
+    });
+  });
 }
 function paintLang() {
   const A = isAr(), html = document.documentElement;
@@ -1773,6 +1988,7 @@ function paintLang() {
   $('#hSize').textContent = tr(sizeKeys().includes('S') ? 'Home size' : 'Home type');
   nameIn.placeholder = tr('First name is fine'); phoneIn.placeholder = tr('Mobile number');
   ccSel.setAttribute('aria-label', tr('Country code'));
+  ccBtn.setAttribute('aria-label', tr('Country code'));
   svg.setAttribute('aria-label', tr('Your home. Tap a part to add it to your quote.'));
   syncThemeButton();
   const langs = R().langs;
@@ -1797,41 +2013,92 @@ function syncThemeButton() {
   themeBtn.setAttribute('aria-pressed', dark ? 'true' : 'false');
   themeBtn.setAttribute('aria-label', tr(dark ? 'Switch to light theme' : 'Switch to dark theme'));
 }
+function themeLum(c) { return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+function themeContrast(ink, bg) {
+  const lin = c => c.map(v => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+  const L = c => { const ch = lin(c); return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]; };
+  const a = L(ink), b = L(bg);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
 function setTheme(theme) {
   const dark = theme === 'dark';
   const toKey = dark ? 'dark' : 'light';
   const root = document.documentElement;
-  const from = readTheme(root);
+  const fromKey = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const read = readTheme(root);
+  const readable = read['--bg'] && read['--ink'] && themeContrast(read['--ink'], read['--bg']) > 2;
+  const from = readable ? read : THEME_PARSED[fromKey];
   const to = THEME_PARSED[toKey];
-  // Pin the colours that are on screen before the attribute change, so the first frame cannot jump.
+  const inkNames = ['--ink', '--ink-2', '--muted', '--faint', '--on-ink'];
+  // Keep the stylesheet on the current theme until the lerp ends, so a
+  // data-theme flip cannot paint destination text on the old background.
   writeTheme(root, from);
-  root.setAttribute('data-theme', toKey);
-  root.style.colorScheme = dark ? 'only dark' : 'only light';
-  const scheme = document.getElementById('colorSchemeMeta');
-  if (scheme) scheme.setAttribute('content', dark ? 'only dark' : 'only light');
-  const supported = document.getElementById('supportedSchemeMeta');
-  if (supported) supported.setAttribute('content', dark ? 'dark' : 'light');
-  const color = document.getElementById('themeColorMeta');
-  if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
+  root.style.backgroundColor = fmtCssColor(from['--bg']);
+  if (document.body) document.body.style.backgroundColor = fmtCssColor(from['--bg']);
   try { localStorage.setItem('gleam.theme', toKey); } catch (_) { /* ignore */ }
-  syncThemeButton();
-  if (H3 && H3.syncTheme) H3.syncTheme();
+  themeBtn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+  themeBtn.setAttribute('aria-label', tr(dark ? 'Switch to light theme' : 'Switch to dark theme'));
+  const paint = cols => {
+    const bg = fmtCssColor(cols['--bg']);
+    const ink = fmtCssColor(cols['--ink']);
+    // Inline colour beats the boot stylesheet, which otherwise keeps the
+    // dark-theme heading colour for the whole return to light.
+    root.style.backgroundColor = bg;
+    root.style.color = ink;
+    if (document.body) {
+      document.body.style.backgroundColor = bg;
+      document.body.style.color = ink;
+    }
+    if (H3 && H3.paintBackdrop) H3.paintBackdrop(bg);
+    else if (H3 && H3.syncTheme) H3.syncTheme();
+  };
+  paint(from);
   const t0 = performance.now();
   cancelAnimationFrame(themeRAF);
+  const finish = () => {
+    const finalBg = THEME_VALUES[toKey]['--bg'];
+    writeTheme(root, to);
+    root.setAttribute('data-theme', toKey);
+    for (const v of THEME_VARS) root.style.removeProperty(v);
+    root.style.removeProperty('background-color');
+    root.style.removeProperty('color');
+    if (document.body) {
+      document.body.style.removeProperty('background-color');
+      document.body.style.removeProperty('color');
+    }
+    root.style.colorScheme = dark ? 'only dark' : 'only light';
+    const scheme = document.getElementById('colorSchemeMeta');
+    if (scheme) scheme.setAttribute('content', dark ? 'only dark' : 'only light');
+    const supported = document.getElementById('supportedSchemeMeta');
+    if (supported) supported.setAttribute('content', dark ? 'dark' : 'light');
+    const color = document.getElementById('themeColorMeta');
+    if (color) color.setAttribute('content', dark ? '#121618' : '#ECEEEE');
+    const canvas = document.querySelector('canvas.gl3');
+    if (canvas) canvas.style.colorScheme = dark ? 'only dark' : 'only light';
+    syncThemeButton();
+    if (H3 && H3.paintBackdrop) H3.paintBackdrop(finalBg);
+    themeRAF = 0;
+    requestAnimationFrame(() => { if (H3 && H3.paintBackdrop) H3.paintBackdrop(finalBg); });
+  };
   const step = now => {
     const u = easeTheme((now - t0) / 450);
-    if (u >= 1) {
-      for (const v of THEME_VARS) root.style.removeProperty(v);
-    } else {
-      const cur = {};
-      for (const v of THEME_VARS) {
+    if (u >= 1) { finish(); return; }
+    const cur = {};
+    const bg = from['--bg'].map((v, i) => v + (to['--bg'][i] - v) * u);
+    const cTo = themeContrast(to['--ink'], bg);
+    const cFrom = themeContrast(from['--ink'], bg);
+    const useTo = cTo >= cFrom && cTo >= 3;
+    for (const v of THEME_VARS) {
+      if (inkNames.includes(v)) cur[v] = (useTo ? to : from)[v];
+      else {
         const a = from[v], b = to[v];
         cur[v] = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u];
       }
-      writeTheme(root, cur);
-      themeRAF = requestAnimationFrame(step);
     }
-    if (H3 && H3.syncTheme) H3.syncTheme();
+    cur['--bg'] = bg;
+    writeTheme(root, cur);
+    paint(cur);
+    themeRAF = requestAnimationFrame(step);
   };
   themeRAF = requestAnimationFrame(step);
 }
@@ -1848,11 +2115,22 @@ langSw.addEventListener('click', e => {
   const root = document.documentElement;
   const ready = next === 'ar' ? ensureArabicFont() : Promise.resolve();
   if (!desktop.matches) {
+    commitCaptionOpacity();
     root.classList.add('lang-out');
-    Promise.all([ready, new Promise(r => setTimeout(r, 180))]).then(() => {
+    Promise.all([ready, new Promise(r => setTimeout(r, 200))]).then(() => {
       if (token !== langGen) return;
-      paintLang();
-      requestAnimationFrame(() => requestAnimationFrame(() => { if (token === langGen) root.classList.remove('lang-out'); }));
+      langFading = true;
+      try { paintLang(); } finally { langFading = false; }
+      let spins = 0;
+      const reveal = () => {
+        if (token !== langGen) return;
+        const foot = document.querySelector('.stage-foot');
+        const hidden = !foot || parseFloat(getComputedStyle(foot).opacity) <= 0.04;
+        if (!hidden && !reduced && spins++ < 30) { requestAnimationFrame(reveal); return; }
+        caption.style.opacity = '1';
+        requestAnimationFrame(() => { if (token === langGen) root.classList.remove('lang-out'); });
+      };
+      requestAnimationFrame(reveal);
     });
     return;
   }
@@ -1869,7 +2147,7 @@ renderRegions();
 applyLang();
 renderHouse(false);
 mapBg.innerHTML = fallbackMap();
-if ('requestIdleCallback' in window) requestIdleCallback(load3d, { timeout: 1200 }); else setTimeout(load3d, 300);
+load3d();
 update();
 chrome();
 })();
