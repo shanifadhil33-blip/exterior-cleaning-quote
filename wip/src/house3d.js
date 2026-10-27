@@ -46,6 +46,10 @@ export function mount(host, opts = {}) {
   renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // The sun does not move with the camera, so the shadow map only has to be
+  // redrawn when the house is rebuilt or a surface is still easing.
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(30, 1.5, 0.2, 80);
   const PI = Math.PI;
@@ -810,6 +814,7 @@ export function mount(host, opts = {}) {
     sun.target.updateMatrixWorld();
     Object.values(parts).forEach(applyClean);
     captureFrame();
+    renderer.shadowMap.needsUpdate = true;
     resize();
   }
 
@@ -1361,6 +1366,13 @@ export function mount(host, opts = {}) {
       el += (VIEW.el - el) * (1 - Math.exp(-dt * 1.4));
       elT = el;
     }
+    let shadowDirty = fxList.length > 0;
+    if (!shadowDirty) {
+      for (const id in parts) {
+        if (parts[id].clean !== parts[id].target) { shadowDirty = true; break; }
+      }
+    }
+    if (shadowDirty) renderer.shadowMap.needsUpdate = true;
     const td = targetDist();
     if (Number.isNaN(dist)) dist = td;
     else if (reduced || td > dist) { dist = td; distV = 0; }
