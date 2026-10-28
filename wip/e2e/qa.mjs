@@ -41,14 +41,16 @@ async function pageReady(page) {
 }
 async function openAt(page, url) {
   let last;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
       await pageReady(page);
       return res;
     } catch (e) {
       last = e;
-      if (attempt === 1 || !/Timeout/.test(String(e && e.message))) throw e;
+      const stalled = /timed.?out|timeout|ERR_CONNECTION|ERR_NETWORK/i.test(String(e && e.message));
+      if (attempt === 2 || !stalled) throw e;
+      await sleep(1500);
     }
   }
   throw last;
