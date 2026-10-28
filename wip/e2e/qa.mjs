@@ -28,13 +28,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // transferring. On the live site that transfer sometimes sits open for more than
 // a minute, and the suite dies before the picture can settle. Commit once the
 // HTML is here, give the fonts a few seconds, then wait for the shown canvas.
-async function openAt(page, url) {
-  const res = await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
+async function pageReady(page) {
   await page.waitForSelector('body', { timeout: 60000 });
+  await page.waitForFunction(() => {
+    const region = document.querySelector('#region');
+    return !!(region && region.value);
+  }, null, { timeout: 90000 });
   await page.evaluate(() => Promise.race([
     document.fonts ? document.fonts.ready : Promise.resolve(),
     new Promise(resolve => setTimeout(resolve, 8000))
   ])).catch(() => {});
+}
+async function openAt(page, url) {
+  const res = await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
+  await pageReady(page);
   return res;
 }
 async function pictureSettled(page) {
@@ -50,7 +57,7 @@ async function pictureSettled(page) {
     const key = [v.az, v.el, v.dist, h.dirt('walls'), h.dirt('roof')].map(n => (+n).toFixed(4)).join();
     if (window.__schemeKey !== key) { window.__schemeKey = key; window.__schemeN = 0; return false; }
     return ++window.__schemeN >= 4;
-  }, null, { timeout: 45000 }).then(() => true).catch(() => false);
+  }, null, { timeout: 90000 }).then(() => true).catch(() => false);
 }
 
 async function noSideScroll(page, tag) {
@@ -87,11 +94,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   if (mk.ar) {
     await page.locator('#langSw button[data-lang="ar"]').click(); await sleep(400);
     await page.reload({ waitUntil: 'commit', timeout: 60000 });
-    await page.waitForSelector('body', { timeout: 60000 });
-    await page.evaluate(() => Promise.race([
-      document.fonts ? document.fonts.ready : Promise.resolve(),
-      new Promise(resolve => setTimeout(resolve, 8000))
-    ])).catch(() => {});
+    await pageReady(page);
     ok(await page.evaluate(() => document.documentElement.dir === 'rtl'), `${tag} Arabic choice remembered after reload`);
   }
   ok(await page.$eval('#region', e => e.value) === mk.region, `${tag} region`);
