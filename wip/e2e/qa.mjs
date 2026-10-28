@@ -24,6 +24,29 @@ const DASH = /[\-\u2010-\u2015\u2212]/;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const fpsLog = [];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// networkidle waits for every font and script to go quiet. On a slow link that
+// never happens, even though the page is ready. Wait for the document load,
+// then for the fonts and a settled picture.
+async function openAt(page, url, waitUntil = 'load') {
+  const res = await page.goto(url, { waitUntil, timeout: 60000 });
+  await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
+  return res;
+}
+async function pictureSettled(page) {
+  return page.waitForFunction(() => {
+    const root = document.documentElement;
+    const stage = document.querySelector('.stage.gl-show');
+    const h = window.__h3d;
+    const canvas = document.querySelector('canvas.gl3');
+    if (!stage || !h || !canvas) return false;
+    if (root.classList.contains('lang-out') || root.classList.contains('lang-swap')) return false;
+    if (getComputedStyle(canvas).opacity !== '1') return false;
+    const v = h.view();
+    const key = [v.az, v.el, v.dist, h.dirt('walls'), h.dirt('roof')].map(n => (+n).toFixed(4)).join();
+    if (window.__schemeKey !== key) { window.__schemeKey = key; window.__schemeN = 0; return false; }
+    return ++window.__schemeN >= 4;
+  }, null, { timeout: 45000 }).then(() => true).catch(() => false);
+}
 
 async function noSideScroll(page, tag) {
   const d = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, w: innerWidth }));
@@ -53,19 +76,20 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   });
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
-  const res = await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
+  const res = await openAt(page, BASE + mk.path);
   ok(res.status() === 200, `${tag} status ${res.status()}`);
   if (mk.sa && !mk.ar) ok(await page.evaluate(() => document.documentElement.dir === 'ltr' && document.documentElement.lang === 'en'), `${tag} SA defaults to English`);
   if (mk.ar) {
     await page.locator('#langSw button[data-lang="ar"]').click(); await sleep(400);
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load', timeout: 60000 });
+    await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
     ok(await page.evaluate(() => document.documentElement.dir === 'rtl'), `${tag} Arabic choice remembered after reload`);
   }
   ok(await page.$eval('#region', e => e.value) === mk.region, `${tag} region`);
   await page.waitForFunction(() => window.__h3d || window.__h3dError, null, { timeout: 20000 }).catch(() => {});
   ok(await page.evaluate(() => !!window.__h3d && document.querySelector('.stage').classList.contains('gl-on')), `${tag} 3D house loaded ${await page.evaluate(() => window.__h3dError || '')}`);
-  await page.waitForFunction(() => document.querySelector('.stage.gl-show'), null, { timeout: 20000 }).catch(() => {});
-  await sleep(1800);
+  ok(await pictureSettled(page), `${tag} picture settled`);
+  await sleep(400);
   ok(await page.evaluate(() => document.documentElement.dir) === (mk.ar ? 'rtl' : 'ltr'), `${tag} text direction`);
   const hero = await page.$eval('#heroP', e => e.textContent);
   ok(hero.includes(mk.ar ? 'احجز من هنا إذا ناسبك' : 'Book it here when it looks right'), `${tag} hero ${hero}`);
@@ -215,7 +239,7 @@ for (const mk of MARKETS) {
   await ctx.addInitScript(() => { window.__links = []; const o = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (/^(sms:|https:\/\/wa\.me)/.test(this.href)) { window.__links.push(this.href); return; } return o.call(this); }; navigator.geolocation.getCurrentPosition = (s, e) => setTimeout(() => e({ code: 1, message: 'denied' }), 50); });
   if (mk.ar) await ctx.addInitScript(() => localStorage.setItem('gleam.lang', 'ar'));
   const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
-  await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
+  await openAt(page, BASE + mk.path);
   await page.locator('.svc[data-id="gutters"] .svc-main').click();
   await page.fill('#name', 'Omar'); await page.fill('#phone', '0412345678');
   await page.locator('#locBtn').click(); await sleep(400);
@@ -234,7 +258,7 @@ for (const mode of ['flat', 'blocked']) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
   const page = await ctx.newPage();
   if (mode === 'blocked') await page.route(/jsdelivr|house3d/, r => r.abort());
-  await page.goto(BASE + '/uk/' + (mode === 'flat' ? '?flat=1' : ''), { waitUntil: 'networkidle' }); await sleep(1500);
+  await openAt(page, BASE + '/uk/' + (mode === 'flat' ? '?flat=1' : ''), mode === 'blocked' ? 'domcontentloaded' : 'load'); await sleep(1500);
   ok(await page.evaluate(() => !document.querySelector('.stage').classList.contains('gl-on') && getComputedStyle(document.querySelector('#house')).display !== 'none'), `fallback ${mode}: still house shown`);
   await page.locator('#house .part[data-part="walls"]').click({ force: true }); await sleep(300);
   ok(await page.$eval('#house', e => e.classList.contains('c-walls')), `fallback ${mode}: tap works`);
@@ -305,21 +329,8 @@ for (const mk of MARKETS) {
       const errs = [];
       page.on('pageerror', e => errs.push(e.message));
       page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
-      await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
-      await page.waitForFunction(() => {
-        const root = document.documentElement;
-        const stage = document.querySelector('.stage.gl-show');
-        const h = window.__h3d;
-        const canvas = document.querySelector('canvas.gl3');
-        if (!stage || !h || !canvas) return false;
-        if (root.classList.contains('lang-out') || root.classList.contains('lang-swap')) return false;
-        if (getComputedStyle(canvas).opacity !== '1') return false;
-        const v = h.view();
-        const key = [v.az, v.el, v.dist, h.dirt('walls'), h.dirt('roof')].map(n => (+n).toFixed(4)).join();
-        if (window.__schemeKey !== key) { window.__schemeKey = key; window.__schemeN = 0; return false; }
-        return ++window.__schemeN >= 4;
-      }, null, { timeout: 20000 }).catch(() => {});
-      await page.evaluate(() => document.fonts.ready);
+      await openAt(page, BASE + mk.path);
+      ok(await pictureSettled(page), `${tag} ${scheme} picture settled`);
       const info = await page.evaluate(() => {
         const bg = el => el ? getComputedStyle(el).backgroundColor : '';
         const cs = getComputedStyle(document.documentElement);
@@ -398,10 +409,8 @@ for (const mk of MARKETS) {
     const errs = [];
     page.on('pageerror', e => errs.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
-    await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
-    await page.waitForFunction(() => window.__h3d && window.__h3d.fps() > 0, null, { timeout: 20000 }).catch(() => {});
-    await page.evaluate(() => document.fonts.ready);
-    await sleep(400);
+    await openAt(page, BASE + mk.path);
+    ok(await pictureSettled(page), `${tag} picture settled`);
     ok(await page.evaluate(() => document.documentElement.getAttribute('data-theme')) === 'light', `${tag} defaults to light`);
     await page.screenshot({ path: `${OUT}/theme-${fk}-${w}-light.png` });
     await page.locator('#themeBtn').click();
