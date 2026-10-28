@@ -352,7 +352,17 @@ for (const mk of MARKETS) {
       page.on('pageerror', e => errs.push(e.message));
       page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
       await openAt(page, BASE + mk.path);
-      ok(await pictureSettled(page), `${tag} ${scheme} picture settled`);
+      // Optional fonts stay on the fallback if they miss the first paint.
+      // Reload once they are cached so both scheme shots use the same face.
+      await page.reload({ waitUntil: 'commit', timeout: 60000 });
+      await pageReady(page);
+      let settled = await pictureSettled(page);
+      if (!settled) {
+        await page.reload({ waitUntil: 'commit', timeout: 60000 });
+        await pageReady(page);
+        settled = await pictureSettled(page);
+      }
+      ok(settled, `${tag} ${scheme} picture settled`);
       const info = await page.evaluate(() => {
         const bg = el => el ? getComputedStyle(el).backgroundColor : '';
         const cs = getComputedStyle(document.documentElement);
@@ -436,7 +446,10 @@ for (const mk of MARKETS) {
     ok(await page.evaluate(() => document.documentElement.getAttribute('data-theme')) === 'light', `${tag} defaults to light`);
     await page.screenshot({ path: `${OUT}/theme-${fk}-${w}-light.png` });
     await page.locator('#themeBtn').click();
-    await sleep(700);
+    await page.waitForFunction(() => {
+      const root = document.documentElement;
+      return root.getAttribute('data-theme') === 'dark' && /dark/.test(getComputedStyle(root).colorScheme);
+    }, null, { timeout: 15000 });
     const dark = await page.evaluate(() => {
       const bg = el => getComputedStyle(el).backgroundColor;
       const cs = getComputedStyle(document.documentElement);
@@ -479,7 +492,8 @@ for (const mk of MARKETS) {
     if (mk.ar) ok(dark.label === 'حول إلى المظهر الفاتح', `${tag} arabic toggle label ${dark.label}`);
     ok(errs.length === 0, `${tag} page errors ${errs.join(';')}`);
     await page.screenshot({ path: `${OUT}/theme-${fk}-${w}-dark.png` });
-    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.reload({ waitUntil: 'commit', timeout: 60000 });
+    await pageReady(page);
     ok(await page.evaluate(() => document.documentElement.getAttribute('data-theme') === 'dark' && getComputedStyle(document.body).backgroundColor !== 'rgb(236, 238, 238)'), `${tag} dark theme restored before paint`);
     await ctx.close();
   }
