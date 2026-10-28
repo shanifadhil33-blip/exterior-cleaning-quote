@@ -24,6 +24,64 @@ const DASH = /[\-\u2010-\u2015\u2212]/;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const fpsLog = [];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// networkidle, and the load event itself, wait while a script or a font is still
+// transferring. On the live site that transfer sometimes sits open for more than
+// a minute, and the suite dies before the picture can settle. Commit once the
+// HTML is here, give the fonts a few seconds, then wait for the shown canvas.
+async function pageReady(page) {
+  await page.waitForSelector('body', { timeout: 60000 });
+  await page.waitForFunction(() => {
+    const region = document.querySelector('#region');
+    return !!(region && region.value);
+  }, null, { timeout: 90000 });
+  await page.evaluate(() => Promise.race([
+    document.fonts ? document.fonts.ready : Promise.resolve(),
+    new Promise(resolve => setTimeout(resolve, 8000))
+  ])).catch(() => {});
+}
+async function openAt(page, url) {
+  let last;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
+      await pageReady(page);
+      return res;
+    } catch (e) {
+      last = e;
+      const stalled = /timed.?out|timeout|ERR_CONNECTION|ERR_NETWORK/i.test(String(e && e.message));
+      if (attempt === 2 || !stalled) throw e;
+      await sleep(1500);
+    }
+  }
+  throw last;
+}
+async function snap(target, opts) {
+  try { await target.screenshot({ timeout: 20000, ...opts }); }
+  catch (e) { if (!/Timeout|font/i.test(String(e && e.message))) throw e; }
+}
+async function ensureSettled(page) {
+  for (let i = 0; i < 3; i++) {
+    if (await pictureSettled(page)) return true;
+    await page.reload({ waitUntil: 'commit', timeout: 60000 }).catch(() => {});
+    await pageReady(page).catch(() => {});
+  }
+  return false;
+}
+async function pictureSettled(page) {
+  return page.waitForFunction(() => {
+    const root = document.documentElement;
+    const stage = document.querySelector('.stage.gl-show');
+    const h = window.__h3d;
+    const canvas = document.querySelector('canvas.gl3');
+    if (!stage || !h || !canvas) return false;
+    if (root.classList.contains('lang-out') || root.classList.contains('lang-swap')) return false;
+    if (getComputedStyle(canvas).opacity !== '1') return false;
+    const v = h.view();
+    const key = [v.az, v.el, v.dist, h.dirt('walls'), h.dirt('roof')].map(n => (+n).toFixed(4)).join();
+    if (window.__schemeKey !== key) { window.__schemeKey = key; window.__schemeN = 0; return false; }
+    return ++window.__schemeN >= 4;
+  }, null, { timeout: 90000 }).then(() => true).catch(() => false);
+}
 
 async function noSideScroll(page, tag) {
   const d = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, w: innerWidth }));
@@ -53,19 +111,19 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   });
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
-  const res = await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
+  const res = await openAt(page, BASE + mk.path);
   ok(res.status() === 200, `${tag} status ${res.status()}`);
   if (mk.sa && !mk.ar) ok(await page.evaluate(() => document.documentElement.dir === 'ltr' && document.documentElement.lang === 'en'), `${tag} SA defaults to English`);
   if (mk.ar) {
     await page.locator('#langSw button[data-lang="ar"]').click(); await sleep(400);
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'commit', timeout: 60000 });
+    await pageReady(page);
     ok(await page.evaluate(() => document.documentElement.dir === 'rtl'), `${tag} Arabic choice remembered after reload`);
   }
   ok(await page.$eval('#region', e => e.value) === mk.region, `${tag} region`);
-  await page.waitForFunction(() => window.__h3d || window.__h3dError, null, { timeout: 20000 }).catch(() => {});
+  ok(await ensureSettled(page), `${tag} picture settled`);
   ok(await page.evaluate(() => !!window.__h3d && document.querySelector('.stage').classList.contains('gl-on')), `${tag} 3D house loaded ${await page.evaluate(() => window.__h3dError || '')}`);
-  await page.waitForFunction(() => document.querySelector('.stage.gl-show'), null, { timeout: 20000 }).catch(() => {});
-  await sleep(1800);
+  await sleep(400);
   ok(await page.evaluate(() => document.documentElement.dir) === (mk.ar ? 'rtl' : 'ltr'), `${tag} text direction`);
   const hero = await page.$eval('#heroP', e => e.textContent);
   ok(hero.includes(mk.ar ? 'احجز من هنا إذا ناسبك' : 'Book it here when it looks right'), `${tag} hero ${hero}`);
@@ -76,7 +134,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     if (phone) ok(f >= 24, `${tag} phone fps ${f}`);
     fpsLog.push(`${tag} ${f}`);
   }
-  await page.screenshot({ path: `${OUT}/${fk}-${w}-1-start.png` });
+  await snap(page, { path: `${OUT}/${fk}-${w}-1-start.png` });
   await noSideScroll(page, tag + ' start');
   await dashCheck(page, tag + ' start');
   ok((await page.$eval('#cc', e => e.value)) && (await page.$eval('#ccShow', e => e.textContent)).endsWith(mk.dial), `${tag} default code ${mk.dial}`);
@@ -93,7 +151,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     prices.push(await page.$eval('.svc[data-id="windows"] .svc-price', e => e.textContent));
     ok(await page.evaluate(() => window.__h3d && window.__h3d.parts().length) === 7, `${tag} 3D parts ${sizes[i]}`);
     await noSideScroll(page, `${tag} size ${sizes[i]}`);
-    if (w === 390 && ['UK', 'SA', 'US'].includes(mk.region) && !(mk.sa && !mk.ar)) { await sleep(300); await page.locator('.stage').screenshot({ path: `${OUT}/${mk.region.toLowerCase()}-390-house-${i}.png` }); }
+    if (w === 390 && ['UK', 'SA', 'US'].includes(mk.region) && !(mk.sa && !mk.ar)) { await sleep(300); await snap(page.locator('.stage'), { path: `${OUT}/${mk.region.toLowerCase()}-390-house-${i}.png` }); }
   }
   ok(new Set(prices).size >= 3, `${tag} prices scale by home ${prices}`);
   await page.locator('#sizeSeg button').nth(1).click(); await sleep(200);
@@ -110,13 +168,13 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
       await page.locator(`.svc[data-id="${id}"] .svc-main`).scrollIntoViewIfNeeded();
       await page.locator(`.svc[data-id="${id}"] .svc-main`).click();
     }
-    const washing = await page.evaluate(id => window.__h3d.washing(id), id);
+    const washing = await page.evaluate(id => !!(window.__h3d && window.__h3d.washing(id)), id);
     ok(washing, `${tag} ${id} 3D wash animation ran`);
     ok(await page.$eval('#house', (e, id) => e.classList.contains('c-' + id), id), `${tag} ${id} selected on house`);
     await sleep(1500);
-    const dirt = await page.evaluate(id => window.__h3d.dirt(id), id);
+    const dirt = await page.evaluate(id => window.__h3d ? window.__h3d.dirt(id) : null, id);
     ok(dirt === 0, `${tag} ${id} grime cleaned on 3D house (${dirt})`);
-    if (id === 'roof' && w === 390) await page.locator('.stage').screenshot({ path: `${OUT}/${fk}-390-wash-roof.png` });
+    if (id === 'roof' && w === 390) await snap(page.locator('.stage'), { path: `${OUT}/${fk}-390-wash-roof.png` });
     const a = num(await amount(page));
     ok(a !== last, `${tag} ${id} price changed ${last}->${a}`);
     last = a;
@@ -131,7 +189,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   await sleep(700);
   ok(num(await amount(page)) !== last, `${tag} inside windows changes price`);
   await page.evaluate(() => scrollTo(0, 0)); await sleep(500);
-  await page.screenshot({ path: `${OUT}/${fk}-${w}-2-clean.png` });
+  await snap(page, { path: `${OUT}/${fk}-${w}-2-clean.png` });
   if (phone) ok(await page.$eval('#bar', e => e.classList.contains('show')), `${tag} price bar shows`);
   // form
   await page.locator('#name').scrollIntoViewIfNeeded();
@@ -153,7 +211,7 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   if (osmVis) ok(/OpenStreetMap contributors/.test(await page.$eval('#osm', e => e.textContent)), `${tag} OSM attribution`);
   await sleep(600);
   await page.locator('#summary').scrollIntoViewIfNeeded(); await sleep(500);
-  await page.screenshot({ path: `${OUT}/${fk}-${w}-3-form.png` });
+  await snap(page, { path: `${OUT}/${fk}-${w}-3-form.png` });
   await noSideScroll(page, tag + ' form');
   await dashCheck(page, tag + ' form');
   const btnTxt = await page.$eval('#sumBtn', e => e.textContent.trim());
@@ -193,13 +251,13 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     await page.waitForSelector('#bookDlg[open]', { timeout: 5000 });
     const b2 = await page.$eval('#bookDlg', e => e.innerText);
     ok(b2.includes('Medium villa') && b2.includes('Yusuf'), `${tag} EN summary`);
-    await page.screenshot({ path: `${OUT}/sa-${w}-5-english.png` });
+    await snap(page, { path: `${OUT}/sa-${w}-5-english.png` });
     await page.locator('#bookClose').click();
     await page.locator('#langSw button[data-lang="ar"]').click(); await sleep(500);
     ok(await page.evaluate(() => document.documentElement.dir) === 'rtl', `${tag} back to Arabic`);
   }
   ok(errs.length === 0, `${tag} page errors ${errs.join(';')}`);
-  await page.screenshot({ path: `${OUT}/${fk}-${w}-4-full.png`, fullPage: true });
+  await snap(page, { path: `${OUT}/${fk}-${w}-4-full.png`, fullPage: true });
   await ctx.close();
 }
 // root guesses, and ?region= still works
@@ -215,7 +273,7 @@ for (const mk of MARKETS) {
   await ctx.addInitScript(() => { window.__links = []; const o = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (/^(sms:|https:\/\/wa\.me)/.test(this.href)) { window.__links.push(this.href); return; } return o.call(this); }; navigator.geolocation.getCurrentPosition = (s, e) => setTimeout(() => e({ code: 1, message: 'denied' }), 50); });
   if (mk.ar) await ctx.addInitScript(() => localStorage.setItem('gleam.lang', 'ar'));
   const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
-  await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
+  await openAt(page, BASE + mk.path);
   await page.locator('.svc[data-id="gutters"] .svc-main').click();
   await page.fill('#name', 'Omar'); await page.fill('#phone', '0412345678');
   await page.locator('#locBtn').click(); await sleep(400);
@@ -226,7 +284,7 @@ for (const mk of MARKETS) {
   const h = await page.$eval('#bookDlg', e => e.innerText);
   ok(!h.includes('maps.google') && h.includes('Omar') && (await page.evaluate(() => window.__links)).length === 0, `${mk.key || mk.path} denied still books on the page`);
   ok(errs.length === 0, `${mk.key || mk.path} denied errors ${errs}`);
-  if (mk.path === '/us/' || mk.sa) await page.screenshot({ path: `${OUT}/${mk.key || mk.path.replace(/\//g, '')}-390-location-denied.png` });
+  if (mk.path === '/us/' || mk.sa) await snap(page, { path: `${OUT}/${mk.key || mk.path.replace(/\//g, '')}-390-location-denied.png` });
   await ctx.close();
 }
 // fallback: without WebGL or with the 3D script blocked, the drawn house still works
@@ -234,11 +292,11 @@ for (const mode of ['flat', 'blocked']) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
   const page = await ctx.newPage();
   if (mode === 'blocked') await page.route(/jsdelivr|house3d/, r => r.abort());
-  await page.goto(BASE + '/uk/' + (mode === 'flat' ? '?flat=1' : ''), { waitUntil: 'networkidle' }); await sleep(1500);
+  await openAt(page, BASE + '/uk/' + (mode === 'flat' ? '?flat=1' : '')); await sleep(1500);
   ok(await page.evaluate(() => !document.querySelector('.stage').classList.contains('gl-on') && getComputedStyle(document.querySelector('#house')).display !== 'none'), `fallback ${mode}: still house shown`);
   await page.locator('#house .part[data-part="walls"]').click({ force: true }); await sleep(300);
   ok(await page.$eval('#house', e => e.classList.contains('c-walls')), `fallback ${mode}: tap works`);
-  await page.locator('.stage').screenshot({ path: `${OUT}/fallback-${mode}-390.png` });
+  await snap(page.locator('.stage'), { path: `${OUT}/fallback-${mode}-390.png` });
   await ctx.close();
 }
 // drag turns the house
@@ -250,7 +308,7 @@ for (const mode of ['flat', 'blocked']) {
   await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5); await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.5, { steps: 8 }); await page.mouse.up(); await sleep(200);
   ok(await page.$eval('#sumAmt', e => e.textContent) === sel0, 'drag does not select a part');
-  await page.screenshot({ path: `${OUT}/us-1280-drag.png` });
+  await snap(page, { path: `${OUT}/us-1280-drag.png` });
   await ctx.close();
 }
 // owner: one number, one config block, prices in one place
@@ -305,21 +363,18 @@ for (const mk of MARKETS) {
       const errs = [];
       page.on('pageerror', e => errs.push(e.message));
       page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
-      await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
-      await page.waitForFunction(() => {
-        const root = document.documentElement;
-        const stage = document.querySelector('.stage.gl-show');
-        const h = window.__h3d;
-        const canvas = document.querySelector('canvas.gl3');
-        if (!stage || !h || !canvas) return false;
-        if (root.classList.contains('lang-out') || root.classList.contains('lang-swap')) return false;
-        if (getComputedStyle(canvas).opacity !== '1') return false;
-        const v = h.view();
-        const key = [v.az, v.el, v.dist, h.dirt('walls'), h.dirt('roof')].map(n => (+n).toFixed(4)).join();
-        if (window.__schemeKey !== key) { window.__schemeKey = key; window.__schemeN = 0; return false; }
-        return ++window.__schemeN >= 4;
-      }, null, { timeout: 20000 }).catch(() => {});
-      await page.evaluate(() => document.fonts.ready);
+      await openAt(page, BASE + mk.path);
+      // Optional fonts stay on the fallback if they miss the first paint.
+      // Reload once they are cached so both scheme shots use the same face.
+      await page.reload({ waitUntil: 'commit', timeout: 60000 });
+      await pageReady(page);
+      let settled = await pictureSettled(page);
+      if (!settled) {
+        await page.reload({ waitUntil: 'commit', timeout: 60000 });
+        await pageReady(page);
+        settled = await pictureSettled(page);
+      }
+      ok(settled, `${tag} ${scheme} picture settled`);
       const info = await page.evaluate(() => {
         const bg = el => el ? getComputedStyle(el).backgroundColor : '';
         const cs = getComputedStyle(document.documentElement);
@@ -349,7 +404,7 @@ for (const mk of MARKETS) {
       ok(errs.length === 0, `${tag} ${scheme} page errors ${errs.join(';')}`);
       if (phone) fpsLog.push(`${tag} ${scheme} ${info.fps}`);
       const path = `${OUT}/scheme-${fk}-${w}-${scheme}.png`;
-      await page.screenshot({ path });
+      await snap(page, { path });
       shots[scheme] = path;
       await ctx.close();
     }
@@ -398,14 +453,19 @@ for (const mk of MARKETS) {
     const errs = [];
     page.on('pageerror', e => errs.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !/tile\.openstreetmap|ERR_|net::/.test(m.text() + (m.location().url || ''))) errs.push('console: ' + m.text()); });
-    await page.goto(BASE + mk.path, { waitUntil: 'networkidle' });
-    await page.waitForFunction(() => window.__h3d && window.__h3d.fps() > 0, null, { timeout: 20000 }).catch(() => {});
-    await page.evaluate(() => document.fonts.ready);
-    await sleep(400);
+    await openAt(page, BASE + mk.path);
+    ok(await pictureSettled(page), `${tag} picture settled`);
     ok(await page.evaluate(() => document.documentElement.getAttribute('data-theme')) === 'light', `${tag} defaults to light`);
-    await page.screenshot({ path: `${OUT}/theme-${fk}-${w}-light.png` });
+    await snap(page, { path: `${OUT}/theme-${fk}-${w}-light.png` });
     await page.locator('#themeBtn').click();
-    await sleep(700);
+    // The colour eases for a few frames, and a dark system scheme already
+    // contains the word dark, so wait until the page itself is charcoal.
+    await page.waitForFunction(() => {
+      const root = document.documentElement;
+      const m = getComputedStyle(document.body).backgroundColor.match(/\d+/g);
+      const rgb = m ? m.slice(0, 3).map(Number) : [];
+      return root.getAttribute('data-theme') === 'dark' && rgb.length === 3 && rgb.every(c => c < 40);
+    }, null, { timeout: 15000 }).catch(() => {});
     const dark = await page.evaluate(() => {
       const bg = el => getComputedStyle(el).backgroundColor;
       const cs = getComputedStyle(document.documentElement);
@@ -447,8 +507,9 @@ for (const mk of MARKETS) {
     ok(!DASH.test(dark.label), `${tag} toggle label dash ${dark.label}`);
     if (mk.ar) ok(dark.label === 'حول إلى المظهر الفاتح', `${tag} arabic toggle label ${dark.label}`);
     ok(errs.length === 0, `${tag} page errors ${errs.join(';')}`);
-    await page.screenshot({ path: `${OUT}/theme-${fk}-${w}-dark.png` });
-    await page.reload({ waitUntil: 'domcontentloaded' });
+    await snap(page, { path: `${OUT}/theme-${fk}-${w}-dark.png` });
+    await page.reload({ waitUntil: 'commit', timeout: 60000 });
+    await pageReady(page);
     ok(await page.evaluate(() => document.documentElement.getAttribute('data-theme') === 'dark' && getComputedStyle(document.body).backgroundColor !== 'rgb(236, 238, 238)'), `${tag} dark theme restored before paint`);
     await ctx.close();
   }
