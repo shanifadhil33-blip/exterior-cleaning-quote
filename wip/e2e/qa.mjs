@@ -40,9 +40,18 @@ async function pageReady(page) {
   ])).catch(() => {});
 }
 async function openAt(page, url) {
-  const res = await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
-  await pageReady(page);
-  return res;
+  let last;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
+      await pageReady(page);
+      return res;
+    } catch (e) {
+      last = e;
+      if (attempt === 1 || !/Timeout/.test(String(e && e.message))) throw e;
+    }
+  }
+  throw last;
 }
 async function pictureSettled(page) {
   return page.waitForFunction(() => {
@@ -98,9 +107,8 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     ok(await page.evaluate(() => document.documentElement.dir === 'rtl'), `${tag} Arabic choice remembered after reload`);
   }
   ok(await page.$eval('#region', e => e.value) === mk.region, `${tag} region`);
-  await page.waitForFunction(() => window.__h3d || window.__h3dError, null, { timeout: 20000 }).catch(() => {});
-  ok(await page.evaluate(() => !!window.__h3d && document.querySelector('.stage').classList.contains('gl-on')), `${tag} 3D house loaded ${await page.evaluate(() => window.__h3dError || '')}`);
   ok(await pictureSettled(page), `${tag} picture settled`);
+  ok(await page.evaluate(() => !!window.__h3d && document.querySelector('.stage').classList.contains('gl-on')), `${tag} 3D house loaded ${await page.evaluate(() => window.__h3dError || '')}`);
   await sleep(400);
   ok(await page.evaluate(() => document.documentElement.dir) === (mk.ar ? 'rtl' : 'ltr'), `${tag} text direction`);
   const hero = await page.$eval('#heroP', e => e.textContent);
