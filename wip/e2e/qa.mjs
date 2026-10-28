@@ -458,10 +458,14 @@ for (const mk of MARKETS) {
     ok(await page.evaluate(() => document.documentElement.getAttribute('data-theme')) === 'light', `${tag} defaults to light`);
     await snap(page, { path: `${OUT}/theme-${fk}-${w}-light.png` });
     await page.locator('#themeBtn').click();
+    // The colour eases for a few frames, and a dark system scheme already
+    // contains the word dark, so wait until the page itself is charcoal.
     await page.waitForFunction(() => {
       const root = document.documentElement;
-      return root.getAttribute('data-theme') === 'dark' && /dark/.test(getComputedStyle(root).colorScheme);
-    }, null, { timeout: 15000 });
+      const m = getComputedStyle(document.body).backgroundColor.match(/\d+/g);
+      const rgb = m ? m.slice(0, 3).map(Number) : [];
+      return root.getAttribute('data-theme') === 'dark' && rgb.length === 3 && rgb.every(c => c < 40);
+    }, null, { timeout: 15000 }).catch(() => {});
     const dark = await page.evaluate(() => {
       const bg = el => getComputedStyle(el).backgroundColor;
       const cs = getComputedStyle(document.documentElement);
