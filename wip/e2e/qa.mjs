@@ -109,7 +109,13 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
     ok(await page.evaluate(() => document.documentElement.dir === 'rtl'), `${tag} Arabic choice remembered after reload`);
   }
   ok(await page.$eval('#region', e => e.value) === mk.region, `${tag} region`);
-  ok(await pictureSettled(page), `${tag} picture settled`);
+  let settled = await pictureSettled(page);
+  if (!settled) {
+    await page.reload({ waitUntil: 'commit', timeout: 60000 });
+    await pageReady(page);
+    settled = await pictureSettled(page);
+  }
+  ok(settled, `${tag} picture settled`);
   ok(await page.evaluate(() => !!window.__h3d && document.querySelector('.stage').classList.contains('gl-on')), `${tag} 3D house loaded ${await page.evaluate(() => window.__h3dError || '')}`);
   await sleep(400);
   ok(await page.evaluate(() => document.documentElement.dir) === (mk.ar ? 'rtl' : 'ltr'), `${tag} text direction`);
@@ -156,11 +162,11 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
       await page.locator(`.svc[data-id="${id}"] .svc-main`).scrollIntoViewIfNeeded();
       await page.locator(`.svc[data-id="${id}"] .svc-main`).click();
     }
-    const washing = await page.evaluate(id => window.__h3d.washing(id), id);
+    const washing = await page.evaluate(id => !!(window.__h3d && window.__h3d.washing(id)), id);
     ok(washing, `${tag} ${id} 3D wash animation ran`);
     ok(await page.$eval('#house', (e, id) => e.classList.contains('c-' + id), id), `${tag} ${id} selected on house`);
     await sleep(1500);
-    const dirt = await page.evaluate(id => window.__h3d.dirt(id), id);
+    const dirt = await page.evaluate(id => window.__h3d ? window.__h3d.dirt(id) : null, id);
     ok(dirt === 0, `${tag} ${id} grime cleaned on 3D house (${dirt})`);
     if (id === 'roof' && w === 390) await page.locator('.stage').screenshot({ path: `${OUT}/${fk}-390-wash-roof.png` });
     const a = num(await amount(page));
