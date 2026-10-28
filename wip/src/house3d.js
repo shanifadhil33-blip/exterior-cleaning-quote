@@ -337,10 +337,23 @@ export function mount(host, opts = {}) {
     };
     const neighbour = side => {
       const nx = side * (W - 0.08) + x0;
-      const wall = box(W, H, Dp - 0.04, nbMat, nx, H / 2, -0.03);
+      // A hair under the main wall top, so the two tops do not share a plane where the houses overlap.
+      const wallH = H - 0.02;
+      const wall = box(W, wallH, Dp - 0.04, nbMat, nx, wallH / 2, -0.03);
       root.add(wall);
-      if (flat) root.add(box(W + 0.02, 0.22, Dp + 0.02, nbMat, nx, H + 0.06, -0.02));
-      else { const rf = gable(W, Dp + 0.3, 0.85, nbRoof); rf.position.set(nx, H - 0.1, 0); root.add(rf); }
+      if (flat) {
+        // Stop short of the main roof slab. The walls still overlap, the roofs do not.
+        const slabL = x0 - (W + 0.08) / 2, slabR = x0 + (W + 0.08) / 2;
+        const outer = nx + side * (W / 2 + 0.06);
+        const party = side < 0 ? slabL - 0.04 : slabR + 0.04;
+        const x1 = Math.min(outer, party), x2 = Math.max(outer, party);
+        root.add(box(Math.max(0.2, x2 - x1), 0.22, Dp + 0.02, nbMat, (x1 + x2) / 2, H + 0.06, -0.02));
+      } else {
+        const span = eaveSpan(W, side < 0 ? 'right' : 'left');
+        const rf = gable(span.width, Dp + 0.3, 0.85, nbRoof);
+        rf.position.set(nx + span.cx, H - 0.1, 0);
+        root.add(rf);
+      }
       const zf = -0.03 + (Dp - 0.04) / 2 + 0.04;
       const zb = -0.03 - (Dp - 0.04) / 2 - 0.04;
       const doorB = s.bays > 2 ? Math.floor(s.bays / 2) : 0;
@@ -360,7 +373,7 @@ export function mount(host, opts = {}) {
         decorSide(sx, f * FH + 0.55, 0.45, side);
       }
       if (!flat) {
-        const gxEnd = nx + side * (W / 2 + 0.16);
+        const gxEnd = nx + side * (W / 2 + 0.32);
         root.add(box(0.05, 0.28, 0.34, revealMat, gxEnd, H + 0.2, 0));
         root.add(box(0.03, 0.18, 0.22, M(C.glassDirty, { roughness: 0.2, metalness: 0.04 }), gxEnd + side * 0.03, H + 0.2, 0));
       }
@@ -395,10 +408,10 @@ export function mount(host, opts = {}) {
 
     // doors sit just proud of the wall so the faces are not coplanar
     const doorX = x0 + (s.bays > 2 ? 0 : -W / 4 + 0.1);
-    root.add(box(0.62, 1.0, 0.04, trimMat, doorX, 0.48, front + 0.02));
-    root.add(box(0.5, 0.86, 0.08, M(C.door), doorX, 0.45, front + 0.05));
-    root.add(box(0.62, 1.0, 0.04, trimMat, doorX, 0.48, -front - 0.02));
-    root.add(box(0.5, 0.86, 0.08, M(C.door), doorX, 0.45, -front - 0.05));
+    root.add(box(0.62, 1.0, 0.04, trimMat, doorX, 0.48, front + 0.08));
+    root.add(box(0.5, 0.86, 0.08, M(C.door), doorX, 0.45, front + 0.11));
+    root.add(box(0.62, 1.0, 0.04, trimMat, doorX, 0.48, -front - 0.08));
+    root.add(box(0.5, 0.86, 0.08, M(C.door), doorX, 0.45, -front - 0.11));
     root.add(box(0.72, 0.06, 0.22, plinthMat, doorX, 0.04, -front - 0.16));
     if (gw) {
       const doorW = Math.max(0.7, gw - 0.36);
@@ -406,14 +419,14 @@ export function mount(host, opts = {}) {
       const doorY = 0.42;
       const gdMat = M(C.door, { roughness: 0.88, flatShading: false });
       const railMat = M(C.frame, { roughness: 0.82, flatShading: false });
-      pw.g.add(box(doorW + 0.14, doorH + 0.12, 0.04, trimMat, gx, doorY, gFront + 0.02));
-      pw.g.add(box(doorW, doorH, 0.045, gdMat, gx, doorY, gFront + 0.05));
-      pw.g.add(box(0.05, doorH, 0.03, railMat, gx - doorW / 2 + 0.06, doorY, gFront + 0.08));
-      pw.g.add(box(0.05, doorH, 0.03, railMat, gx + doorW / 2 - 0.06, doorY, gFront + 0.08));
-      pw.g.add(box(0.045, doorH - 0.08, 0.03, railMat, gx, doorY, gFront + 0.08));
-      pw.g.add(box(doorW - 0.16, 0.045, 0.03, railMat, gx, doorY, gFront + 0.08));
-      pw.g.add(box(doorW - 0.16, 0.04, 0.025, railMat, gx, doorY + doorH * 0.22, gFront + 0.075));
-      pw.g.add(box(doorW - 0.16, 0.04, 0.025, railMat, gx, doorY - doorH * 0.22, gFront + 0.075));
+      pw.g.add(box(doorW + 0.14, doorH + 0.12, 0.04, trimMat, gx, doorY, gFront + 0.05));
+      pw.g.add(box(doorW, doorH, 0.045, gdMat, gx, doorY, gFront + 0.08));
+      pw.g.add(box(0.05, doorH, 0.03, railMat, gx - doorW / 2 + 0.06, doorY, gFront + 0.11));
+      pw.g.add(box(0.05, doorH, 0.03, railMat, gx + doorW / 2 - 0.06, doorY, gFront + 0.11));
+      pw.g.add(box(0.045, doorH - 0.08, 0.03, railMat, gx, doorY, gFront + 0.11));
+      pw.g.add(box(doorW - 0.16, 0.045, 0.03, railMat, gx, doorY, gFront + 0.11));
+      pw.g.add(box(doorW - 0.16, 0.04, 0.025, railMat, gx, doorY + doorH * 0.22, gFront + 0.105));
+      pw.g.add(box(doorW - 0.16, 0.04, 0.025, railMat, gx, doorY - doorH * 0.22, gFront + 0.105));
     }
 
     // windows
@@ -428,7 +441,8 @@ export function mount(host, opts = {}) {
     };
     const doorBay = s.bays > 2 ? Math.floor(s.bays / 2) : 0;
     const winFace = (wx, wy, wz, out) => {
-      pwin.g.add(box(0.68, 0.64, 0.05, revealMat, wx, wy, wz));
+      // The reveal's inner face used to sit on the wall. Bury it and keep the outer face put.
+      pwin.g.add(box(0.68, 0.64, 0.09, revealMat, wx, wy, wz - out * 0.02));
       pwin.g.add(box(0.58, 0.54, 0.05, frameMat, wx, wy, wz + out * 0.02));
       pwin.g.add(pane(0.46, 0.42, 0.03, wx, wy, wz + out * 0.04));
       pwin.g.add(box(0.07, 0.42, 0.03, frameMat, wx, wy, wz + out * 0.05));
@@ -462,7 +476,7 @@ export function mount(host, opts = {}) {
     else if (gw && s.floors > 1 && s.neigh !== 'both') { sideWin(1, -0.28, 1); sideWin(1, 0.42, 1); }
     if (!flat) {
       const gableLight = sign => {
-        const sx = x0 + sign * ((W + 0.3) / 2 + 0.03);
+        const sx = x0 + sign * (W / 2 + 0.28);
         pwin.g.add(box(0.05, 0.32, 0.38, revealMat, sx, H + 0.28, 0));
         pwin.g.add(box(0.05, 0.22, 0.26, frameMat, sx + sign * 0.03, H + 0.28, 0));
         pwin.g.add(pane(0.05, 0.16, 0.18, sx + sign * 0.05, H + 0.28, 0));
@@ -472,14 +486,14 @@ export function mount(host, opts = {}) {
       if (s.neigh && s.neigh !== 'both') gableLight(1);
     }
     if (gw) {
-      pwin.g.add(box(0.52, 0.38, 0.04, revealMat, gx, 0.62, gBack - 0.02));
-      pwin.g.add(box(0.4, 0.26, 0.04, frameMat, gx, 0.62, gBack - 0.05));
-      pwin.g.add(pane(0.3, 0.16, 0.03, gx, 0.62, gBack - 0.07));
-      pwin.g.add(box(Math.min(0.7, gw - 0.4), 0.22, 0.04, revealMat, gx, 0.86, gFront + 0.02));
-      pwin.g.add(pane(Math.min(0.56, gw - 0.52), 0.14, 0.03, gx, 0.86, gFront + 0.06));
-      pwin.g.add(box(0.05, 0.42, 0.48, revealMat, gx + gw / 2 + 0.02, 0.58, gZ));
-      pwin.g.add(box(0.04, 0.32, 0.36, frameMat, gx + gw / 2 + 0.05, 0.58, gZ));
-      pwin.g.add(pane(0.025, 0.22, 0.26, gx + gw / 2 + 0.07, 0.58, gZ));
+      pwin.g.add(box(0.52, 0.38, 0.04, revealMat, gx, 0.62, gBack - 0.04));
+      pwin.g.add(box(0.4, 0.26, 0.04, frameMat, gx, 0.62, gBack - 0.07));
+      pwin.g.add(pane(0.3, 0.16, 0.03, gx, 0.62, gBack - 0.09));
+      pwin.g.add(box(Math.min(0.7, gw - 0.4), 0.22, 0.04, revealMat, gx, 0.86, gFront + 0.04));
+      pwin.g.add(pane(Math.min(0.56, gw - 0.52), 0.14, 0.03, gx, 0.86, gFront + 0.08));
+      pwin.g.add(box(0.05, 0.42, 0.48, revealMat, gx + gw / 2 + 0.05, 0.58, gZ));
+      pwin.g.add(box(0.04, 0.32, 0.36, frameMat, gx + gw / 2 + 0.08, 0.58, gZ));
+      pwin.g.add(pane(0.025, 0.22, 0.26, gx + gw / 2 + 0.1, 0.58, gZ));
     }
 
     // roof, dropped into the wall so the soffit is not coplanar with the wall top
@@ -488,13 +502,15 @@ export function mount(host, opts = {}) {
     const RH = 0.85, RD = Dp + 0.3, RW = W + 0.3;
     const roofSink = 0.05;
     let slope = 0;
+    let roofL = x0 - RW / 2, roofR = x0 + RW / 2;
     if (flat) {
       pr.g.add(box(W + 0.08, 0.1, Dp + 0.08, roofMat, x0, H + 0.02, 0));
       const par = dirtyMat(pr, C.wallDirty, C.wall);
       pr.g.add(box(W + 0.1, 0.26, 0.1, par, x0, H + 0.16, front + 0.02));
       pr.g.add(box(W + 0.1, 0.26, 0.1, par, x0, H + 0.16, -front - 0.02));
-      pr.g.add(box(0.1, 0.26, Dp, par, x0 - W / 2 - 0.02, H + 0.16, 0));
-      pr.g.add(box(0.1, 0.26, Dp, par, x0 + W / 2 + 0.02, H + 0.16, 0));
+      // A shared side is closed by the neighbour roof. A parapet there sat on the party face.
+      if (s.neigh !== 'left' && s.neigh !== 'both') pr.g.add(box(0.1, 0.26, Dp, par, x0 - W / 2 - 0.02, H + 0.16, 0));
+      if (s.neigh !== 'both') pr.g.add(box(0.1, 0.26, Dp, par, x0 + W / 2 + 0.02, H + 0.16, 0));
       for (let i = 0; i < 10 + s.bays * 2; i++) {
         const m = new THREE.Mesh(new THREE.CircleGeometry(0.12 + r() * 0.22, 7), decalMat(C.grime, 0.4));
         m.rotation.x = -Math.PI / 2; m.position.set(x0 + (r() - 0.5) * (W - 0.4), H + 0.095, (r() - 0.5) * (Dp - 0.4));
@@ -503,13 +519,16 @@ export function mount(host, opts = {}) {
       if (gw) {
         pr.g.add(box(gw + 0.08, 0.08, gDepth + 0.08, roofMat, gx, 0.98, gZ));
         const lip = dirtyMat(pr, C.wallDirty, C.wall, { roughness: 0.94, flatShading: false });
-        pr.g.add(box(gw + 0.1, 0.16, 0.08, lip, gx, 1.08, gFront + 0.02));
-        pr.g.add(box(gw + 0.1, 0.16, 0.08, lip, gx, 1.08, gBack - 0.02));
+        pr.g.add(box(gw + 0.1, 0.16, 0.08, lip, gx, 1.04, gFront + 0.04));
+        pr.g.add(box(gw + 0.1, 0.16, 0.08, lip, gx, 1.04, gBack - 0.04));
       }
     } else {
-      const roof = s.neigh ? gable(RW, RD, RH, roofMat) : hip(RW, RD, RH, roofMat);
-      roof.position.set(x0, H - roofSink, 0); pr.g.add(roof);
-      if (gw) { const gr = gable(gw + 0.36, gDepth + 0.4, 0.48, roofMat); gr.position.set(gx, 0.96, gZ); pr.g.add(gr); }
+      const span = eaveSpan(W, s.neigh || null);
+      const roof = s.neigh ? gable(span.width, RD, RH, roofMat) : hip(RW, RD, RH, roofMat);
+      if (s.neigh) { roofL = x0 + span.left; roofR = x0 + span.right; }
+      roof.position.set(s.neigh ? x0 + span.cx : x0, H - roofSink, 0);
+      pr.g.add(pickEither(roof));
+      if (gw) { const gr = gable(gw + 0.36, gDepth + 0.4, 0.48, roofMat); gr.position.set(gx, 0.96, gZ); pr.g.add(pickEither(gr)); }
       slope = Math.atan2(RH, RD / 2);
       const mossMat = new THREE.MeshStandardMaterial({ color: col('#7f8f62'), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
       const ny = Math.cos(slope), nz = Math.sin(slope);
@@ -517,8 +536,11 @@ export function mount(host, opts = {}) {
         const t = 0.15 + r() * 0.75, z = (RD / 2) * (1 - t), y = H - roofSink + RH * t;
         const half = (RW / 2) * (s.neigh ? 1 : (1 - t * 0.85)) - 0.1;
         const rad = 0.04 + r() * 0.045, lift = rad + 0.035;
+        const mx = s.neigh
+          ? roofL + 0.12 + r() * Math.max(0.2, (roofR - roofL) - 0.24)
+          : x0 + (r() * 2 - 1) * half;
         const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 0), mossMat);
-        m.position.set(x0 + (r() * 2 - 1) * half, y + ny * lift, z + nz * lift); m.scale.y = 0.42;
+        m.position.set(mx, y + ny * lift, z + nz * lift); m.scale.y = 0.42;
         m.castShadow = false;
         grime(pr, m, 'shrink');
       }
@@ -566,11 +588,12 @@ export function mount(host, opts = {}) {
       const gutH = 0.08, gutD = 0.1;
       const gutY = flat ? H + 0.02 : H - 0.16;
       const zE = (flat ? front + 0.08 : RD / 2 + 0.02) + gutD / 2;
-      const xL = x0 - (flat ? W / 2 + 0.06 : RW / 2) - gutD / 2;
-      const xR = x0 + (flat ? W / 2 + 0.06 : RW / 2) + gutD / 2;
+      const xL = flat ? x0 - W / 2 - 0.06 - gutD / 2 : roofL - gutD / 2;
+      const xR = flat ? x0 + W / 2 + 0.06 + gutD / 2 : roofR + gutD / 2;
       const span = xR - xL;
-      pg.g.add(box(span, gutH, gutD, gutMat, x0, gutY, zE - gutD / 2));
-      pg.g.add(box(span, gutH, gutD, gutMat, x0, gutY, -(zE - gutD / 2)));
+      const xC = (xL + xR) / 2;
+      pg.g.add(box(span, gutH, gutD, gutMat, xC, gutY, zE - gutD / 2));
+      pg.g.add(box(span, gutH, gutD, gutMat, xC, gutY, -(zE - gutD / 2)));
       // Hip roofs and flat parapets have side eaves. A gable end does not.
       // The side run used to share its end faces with the front and back
       // gutters. Those coplanar corners flashed on the back wall.
@@ -581,15 +604,15 @@ export function mount(host, opts = {}) {
       }
       const pipeTop = gutY - gutH / 2, pipeH = Math.max(0.4, pipeTop + 0.02);
       const pipe = (x, z) => pg.g.add(box(0.1, pipeH, 0.1, gutMat, x, pipeTop - pipeH / 2, z));
-      pipe(xL + 0.12, zE - gutD);
-      pipe(xL + 0.12, -(zE - gutD));
-      if (!s.neigh) { pipe(xR - 0.12, zE - gutD); pipe(xR - 0.12, -(zE - gutD)); }
+      pipe(xL + 0.2, zE - gutD);
+      pipe(xL + 0.2, -(zE - gutD));
+      if (!s.neigh) { pipe(xR - 0.2, zE - gutD); pipe(xR - 0.2, -(zE - gutD)); }
       if (!flat) {
         const leafMat = new THREE.MeshStandardMaterial({ color: col(C.leaf), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
         for (let i = 0; i < 8 + s.bays * 2; i++) {
           const m = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.02, 0.05), leafMat);
           const frontLeaf = r() > 0.45;
-          m.position.set(x0 + (r() - 0.5) * (span - 0.3), gutY + gutH / 2 + 0.012, (frontLeaf ? 1 : -1) * (zE - gutD) + (r() - 0.5) * 0.04);
+          m.position.set(xC + (r() - 0.5) * (span - 0.3), gutY + gutH / 2 + 0.012, (frontLeaf ? 1 : -1) * (zE - gutD) + (r() - 0.5) * 0.04);
           m.rotation.set(r() * 0.4, r() * 3, r() * 0.4);
           m.castShadow = false;
           grime(pg, m, 'fall');
@@ -845,6 +868,26 @@ export function mount(host, opts = {}) {
     mesh.receiveShadow = true;
     return mesh;
   }
+  // Slopes face away from the camera on the far side of a pitch. The draw
+  // stays single sided. A tap has to hit the face from the outside either way.
+  function pickEither(mesh) {
+    const mat = mesh.material;
+    mesh.raycast = function (raycaster, intersects) {
+      const prev = mat.side;
+      mat.side = THREE.DoubleSide;
+      THREE.Mesh.prototype.raycast.call(this, raycaster, intersects);
+      mat.side = prev;
+    };
+    return mesh;
+  }
+  // Open ends overhang the wall. A party end is buried inside the wall so its
+  // cap is not on the same plane as the shared face.
+  function eaveSpan(width, party) {
+    const over = 0.15, bury = 0.12;
+    const left = -width / 2 + (party === 'left' || party === 'both' ? bury : -over);
+    const right = width / 2 + (party === 'right' || party === 'both' ? -bury : over);
+    return { left, right, width: right - left, cx: (left + right) / 2 };
+  }
 
   function applyClean(p) {
     const c = p.clean, e = c * c * (3 - 2 * c);
@@ -1030,7 +1073,9 @@ export function mount(host, opts = {}) {
     }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.mode) {
-      if (Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
+      // A finger does not land still. Anything under this stays a tap.
+      const slop = drag.type === 'mouse' ? 6 : 18;
+      if (Math.abs(dx) < slop && Math.abs(dy) < slop) return;
       // A vertical swipe scrolls the page. A drag that leads sideways is a turn,
       // and its vertical part tilts. Mouse always orbits.
       if (drag.type !== 'mouse' && Math.abs(dy) > Math.abs(dx) * 1.25 && Math.abs(dx) < 16) drag.mode = 'scroll';
