@@ -24,12 +24,17 @@ const DASH = /[\-\u2010-\u2015\u2212]/;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const fpsLog = [];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-// networkidle waits for every font and script to go quiet. On a slow link that
-// never happens, even though the page is ready. Wait for the document load,
-// then for the fonts and a settled picture.
-async function openAt(page, url, waitUntil = 'load') {
-  const res = await page.goto(url, { waitUntil, timeout: 60000 });
-  await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
+// networkidle, and the load event itself, wait while a script or a font is still
+// transferring. On the live site that transfer sometimes sits open for more than
+// a minute, and the suite dies before the picture can settle. Commit once the
+// HTML is here, give the fonts a few seconds, then wait for the shown canvas.
+async function openAt(page, url) {
+  const res = await page.goto(url, { waitUntil: 'commit', timeout: 60000 });
+  await page.waitForSelector('body', { timeout: 60000 });
+  await page.evaluate(() => Promise.race([
+    document.fonts ? document.fonts.ready : Promise.resolve(),
+    new Promise(resolve => setTimeout(resolve, 8000))
+  ])).catch(() => {});
   return res;
 }
 async function pictureSettled(page) {
@@ -81,8 +86,12 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   if (mk.sa && !mk.ar) ok(await page.evaluate(() => document.documentElement.dir === 'ltr' && document.documentElement.lang === 'en'), `${tag} SA defaults to English`);
   if (mk.ar) {
     await page.locator('#langSw button[data-lang="ar"]').click(); await sleep(400);
-    await page.reload({ waitUntil: 'load', timeout: 60000 });
-    await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
+    await page.reload({ waitUntil: 'commit', timeout: 60000 });
+    await page.waitForSelector('body', { timeout: 60000 });
+    await page.evaluate(() => Promise.race([
+      document.fonts ? document.fonts.ready : Promise.resolve(),
+      new Promise(resolve => setTimeout(resolve, 8000))
+    ])).catch(() => {});
     ok(await page.evaluate(() => document.documentElement.dir === 'rtl'), `${tag} Arabic choice remembered after reload`);
   }
   ok(await page.$eval('#region', e => e.value) === mk.region, `${tag} region`);
@@ -258,7 +267,7 @@ for (const mode of ['flat', 'blocked']) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
   const page = await ctx.newPage();
   if (mode === 'blocked') await page.route(/jsdelivr|house3d/, r => r.abort());
-  await openAt(page, BASE + '/uk/' + (mode === 'flat' ? '?flat=1' : ''), mode === 'blocked' ? 'domcontentloaded' : 'load'); await sleep(1500);
+  await openAt(page, BASE + '/uk/' + (mode === 'flat' ? '?flat=1' : '')); await sleep(1500);
   ok(await page.evaluate(() => !document.querySelector('.stage').classList.contains('gl-on') && getComputedStyle(document.querySelector('#house')).display !== 'none'), `fallback ${mode}: still house shown`);
   await page.locator('#house .part[data-part="walls"]').click({ force: true }); await sleep(300);
   ok(await page.$eval('#house', e => e.classList.contains('c-walls')), `fallback ${mode}: tap works`);
