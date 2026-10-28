@@ -32,7 +32,7 @@
 </script>
 <style id="bootPaint">html,body{background:#ECEEEE;color:#1D2125}html[data-theme="dark"],html[data-theme="dark"] body{background:#121618;color:#F4F6F7}</style>
 <title>Gleam | Instant exterior cleaning quote</title>
-<meta name="description" content="Build your exterior cleaning quote on your own home and book it by text or WhatsApp.">
+<meta name="description" content="Build your exterior cleaning quote on your own home and book it here.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231D2125'/%3E%3Cpath d='M6 23l7.5-12 4.2 6.4 2.8-3.8L26 23' fill='none' stroke='%23F9FAFA' stroke-width='2.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" } }
@@ -379,6 +379,22 @@ html[data-theme="dark"] .tiles img{filter:grayscale(1) invert(1) brightness(.78)
 .btn:disabled{opacity:.3;cursor:default;transform:none}
 .status{margin-top:12px;text-align:center;font-size:13.5px;color:var(--muted)}
 .status.ok{color:var(--ink);font-weight:550}
+dialog.book{width:min(440px,calc(100% - 32px));max-height:min(720px,calc(100dvh - 32px));margin:auto;padding:22px 20px 20px;border:1px solid var(--line);border-radius:28px;background:var(--surface);color:var(--ink);overflow:auto;opacity:0;transition:opacity .25s var(--ease),overlay .25s allow-discrete,display .25s allow-discrete}
+dialog.book[open]{opacity:1}
+dialog.book form{margin:0}
+dialog.book .h2{margin:0 0 14px}
+dialog.book [hidden]{display:none}
+@starting-style{dialog.book[open]{opacity:0}}
+dialog.book:modal{overscroll-behavior:contain}
+dialog.book::backdrop{background:color-mix(in srgb,var(--ink) 32%,transparent);overflow:hidden;overscroll-behavior:contain}
+.book-person{margin:0 0 4px;font-size:15.5px}
+.book-total{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:15px;color:var(--muted)}
+.book-total strong{font-size:28px;letter-spacing:-.04em;color:var(--ink)}
+.book-when,.book-loc{margin:10px 0 0;font-size:14px;color:var(--ink-2);overflow-wrap:anywhere}
+.book-sent{margin:0;font-size:16px;line-height:1.45}
+.book-actions{display:grid;gap:8px;margin-top:18px}
+.book-close{height:44px;border:0;background:none;color:var(--muted);font-size:15px;font-weight:600}
+dialog.book.is-sent .book-close{height:56px;border-radius:999px;background:var(--ink);color:var(--on-ink)}
 .foot{margin-top:40px;font-size:13px;color:var(--faint)}
 
 /* sticky bar, phones */
@@ -529,7 +545,7 @@ html.gl-wait .house{visibility:hidden;height:min(calc(100cqi / 1.12),74svh);max-
           <div class="loc-row">
             <button class="loc-btn" id="locBtn" type="button">
               <span class="ico" aria-hidden="true"><svg class="pin-i" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span class="spin"></span></span>
-              <span><span class="loc-t" id="locT">Share my location</span><span class="loc-s" id="locS">Adds a map pin to your message.</span></span>
+              <span><span class="loc-t" id="locT">Share my location</span><span class="loc-s" id="locS">Adds a map pin to your request.</span></span>
             </button>
             <button class="loc-x" id="locX" type="button">Remove</button>
           </div>
@@ -557,6 +573,17 @@ html.gl-wait .house{visibility:hidden;height:min(calc(100cqi / 1.12),74svh);max-
   <footer class="foot narrow">Demo page with sample prices.</footer>
 </div>
 
+<dialog class="book" id="bookDlg" aria-labelledby="bookTitle">
+  <form method="dialog">
+    <h2 class="h2" id="bookTitle"></h2>
+    <div id="bookBody"></div>
+    <div class="book-actions">
+      <button class="btn" id="bookSend" type="button"></button>
+      <button class="book-close" id="bookClose" type="submit" value="close"></button>
+    </div>
+  </form>
+</dialog>
+
 <div class="bar" id="bar">
   <div class="bar-in">
     <div class="bar-l">
@@ -576,7 +603,7 @@ html.gl-wait .house{visibility:hidden;height:min(calc(100cqi / 1.12),74svh);max-
    BUSINESS SETTINGS. Change these per client.
    ===================================================================== */
 // Placeholder only. Put the firm's own number here, digits only, country code first.
-// The same number is used for text messages and WhatsApp.
+// The demo confirms on this page and does not call the number.
 const BOOKING_NUMBER = '971500000000';
 
 const CONFIG = {
@@ -585,11 +612,12 @@ const CONFIG = {
   bundle: { minServices: 3, percent: 10 },   // set percent to 0 to turn the bundle saving off
   workDays: [1, 2, 3, 4, 5, 6],              // 0 is Sunday, 6 is Saturday
   daysAhead: 12,                             // how many bookable days to show
-  // Each market: how customers book ('sms' opens a text message, 'whatsapp' opens wa.me),
-  // the default country code for the mobile field, the home types shown and all prices.
+  // Each market: booking is the name of a function in CHANNELS. The demo uses page.
+  // A client can add a function and point booking at it. The payload stays the same.
+  // Also the default country code, the home types shown and all prices.
   regions: {
     US: { label: 'US $', currency: 'USD', locale: 'en-US', minimum: 150, units: 'ft',
-      booking: 'sms', country: 'US', sizes: ['S', 'M', 'L'],
+      booking: 'page', country: 'US', sizes: ['S', 'M', 'L'],
       words: { pipes: 'downspouts', walls: 'Siding, stucco or brick' },
       prices: {
         windows:       { S: 150, M: 225, L: 325 },
@@ -602,7 +630,7 @@ const CONFIG = {
         patio:         { small: 100, medium: 150, large: 225 }
       } },
     UK: { label: 'UK £', currency: 'GBP', locale: 'en-GB', minimum: 40, units: 'm',
-      booking: 'whatsapp', country: 'GB', sizes: ['DET', 'SEMI', 'TER', 'BUN'],
+      booking: 'page', country: 'GB', sizes: ['DET', 'SEMI', 'TER', 'BUN'],
       words: { pipes: 'downpipes', walls: 'Render, brick or cladding' },
       prices: {
         windows:       { TER: 25, SEMI: 35, DET: 50, BUN: 35 },
@@ -615,7 +643,7 @@ const CONFIG = {
         patio:         { small: 80, medium: 130, large: 190 }
       } },
     IE: { label: 'IE €', currency: 'EUR', locale: 'en-IE', minimum: 60, units: 'm',
-      booking: 'whatsapp', country: 'IE', sizes: ['DET', 'SEMI', 'TER', 'BUN'],
+      booking: 'page', country: 'IE', sizes: ['DET', 'SEMI', 'TER', 'BUN'],
       words: { pipes: 'downpipes', walls: 'Render, brick or cladding' },
       prices: {
         windows:       { TER: 35, SEMI: 45, DET: 65, BUN: 45 },
@@ -628,7 +656,7 @@ const CONFIG = {
         patio:         { small: 100, medium: 160, large: 230 }
       } },
     AU: { label: 'AU $', currency: 'AUD', locale: 'en-AU', minimum: 160, units: 'm',
-      booking: 'whatsapp', country: 'AU', sizes: ['S', 'M', 'L'],
+      booking: 'page', country: 'AU', sizes: ['S', 'M', 'L'],
       words: { pipes: 'downpipes', walls: 'Render, brick or weatherboard' },
       prices: {
         windows:       { S: 180, M: 280, L: 400 },
@@ -641,7 +669,7 @@ const CONFIG = {
         patio:         { small: 130, medium: 190, large: 280 }
       } },
     CA: { label: 'CA $', currency: 'CAD', locale: 'en-CA', minimum: 165, units: 'm',
-      booking: 'sms', country: 'CA', sizes: ['S', 'M', 'L'],
+      booking: 'page', country: 'CA', sizes: ['S', 'M', 'L'],
       words: { pipes: 'downspouts', walls: 'Siding, stucco or brick' },
       prices: {
         windows:       { S: 175, M: 265, L: 380 },
@@ -654,7 +682,7 @@ const CONFIG = {
         patio:         { small: 115, medium: 175, large: 260 }
       } },
     NZ: { label: 'NZ $', currency: 'NZD', locale: 'en-NZ', minimum: 150, units: 'm',
-      booking: 'sms', country: 'NZ', sizes: ['S', 'M', 'L'],
+      booking: 'page', country: 'NZ', sizes: ['S', 'M', 'L'],
       words: { pipes: 'downpipes', walls: 'Weatherboard, brick or plaster' },
       prices: {
         windows:       { S: 170, M: 260, L: 380 },
@@ -668,7 +696,7 @@ const CONFIG = {
       } },
     // Saudi Arabia: Arabic first, with an English switch. Solar is priced at SAR 35 to 45 a panel.
     SA: { label: 'SA SAR', currency: 'SAR', locale: 'en-SA', minimum: 250, units: 'm',
-      booking: 'whatsapp', country: 'SA', sizes: ['VS', 'VM', 'VL', 'DUP', 'APT'], langs: ['en', 'ar'],
+      booking: 'page', country: 'SA', sizes: ['VS', 'VM', 'VL', 'DUP', 'APT'], langs: ['en', 'ar'],
       words: { pipes: 'drain pipes', walls: 'Stone, paint or marble' },
       prices: {
         windows:       { VS: 350, VM: 900, VL: 2000, DUP: 1100, APT: 350 },
@@ -712,31 +740,27 @@ const COUNTRIES = [
   ['KW', 'Kuwait', '+965', '🇰🇼'], ['BH', 'Bahrain', '+973', '🇧🇭'], ['OM', 'Oman', '+968', '🇴🇲'],
   ['EG', 'Egypt', '+20', '🇪🇬'], ['JO', 'Jordan', '+962', '🇯🇴'], ['BD', 'Bangladesh', '+880', '🇧🇩']
 ];
-const COPY = {
-  sms: { hero: 'Text it to us when it looks right.', btn: 'Text us', busy: 'Opening messages',
-    note: 'The final price is confirmed with you by text.', ready: 'Opens your messages with your request ready to send.',
-    sent: 'Your request is ready in your messages. Tap send to book.' },
-  whatsapp: { hero: 'Book it on WhatsApp when it looks right.', btn: 'Book on WhatsApp', busy: 'Opening WhatsApp',
-    note: 'The final price is confirmed with you on WhatsApp.', ready: 'Opens WhatsApp with your request ready to send.',
-    sent: 'Your request is ready in WhatsApp. Tap send to book.' }
-};
 
 /* Arabic text for the Saudi page. Keys are the English text. */
 const AR = {
   'Your price, before anyone visits.': 'سعرك جاهز قبل ما يزورك أحد.',
   'Tap what needs cleaning and watch the price build.': 'اضغط على اللي يحتاج تنظيف وشوف السعر يتحدث قدامك.',
-  'Book it on WhatsApp when it looks right.': 'واحجز على واتساب إذا ناسبك.',
-  'Book on WhatsApp': 'احجز على واتساب', 'Opening WhatsApp': 'نفتح واتساب',
-  'The final price is confirmed with you on WhatsApp.': 'نأكد معك السعر النهائي على واتساب.',
-  'Opens WhatsApp with your request ready to send.': 'يفتح واتساب وطلبك جاهز للإرسال.',
-  'Your request is ready in WhatsApp. Tap send to book.': 'طلبك جاهز في واتساب. اضغط إرسال وتم الحجز.',
+  'Book it here when it looks right.': 'احجز من هنا إذا ناسبك.',
+  'Book here': 'احجز هنا',
+  'The final price is confirmed with you.': 'نأكد معك السعر النهائي.',
+  'Sends your request from this page.': 'يرسل طلبك من هذه الصفحة.',
+  'Your request': 'طلبك',
+  'Send request': 'أرسل الطلب',
+  'Request sent': 'تم إرسال الطلب',
+  'We have your name, your number and the services you picked.': 'وصلتنا اسمك ورقمك والخدمات اللي اخترتها.',
+  'Close': 'إغلاق',
   'Based on what you picked.': 'حسب اختياراتك.',
   'Tap any part of your home to add it': 'اضغط على أي جزء من بيتك لإضافته',
   'Estimate': 'التقدير', 'Home size': 'حجم البيت', 'Home type': 'نوع البيت',
   'What needs cleaning': 'وش تبي ننظف', 'Your details': 'بياناتك', 'Your name': 'اسمك',
   'First name is fine': 'الاسم الأول يكفي', 'Mobile number': 'رقم الجوال',
   'Preferred day': 'اليوم المناسب', 'Time of day': 'الوقت المناسب',
-  'Share my location': 'شارك موقعي', 'Pin moved. Drag the map to adjust.': 'تم تحريك الدبوس. اسحب الخريطة للتعديل.', 'Adds a map pin to your message.': 'يضيف موقعك على الخريطة في رسالتك.',
+  'Share my location': 'شارك موقعي', 'Pin moved. Drag the map to adjust.': 'تم تحريك الدبوس. اسحب الخريطة للتعديل.', 'Adds a map pin to your request.': 'يضيف موقعك على الخريطة في طلبك.',
   'Remove': 'إزالة', 'Your estimate': 'تقديرك', 'Demo page with sample prices.': 'صفحة تجريبية بأسعار للعرض.',
   'Region and currency': 'المنطقة والعملة', 'Country code': 'رمز الدولة',
   'Switch to dark theme': 'حول إلى المظهر الداكن', 'Switch to light theme': 'حول إلى المظهر الفاتح',
@@ -764,7 +788,7 @@ const AR = {
   'Your location could not be found. You can still book without it.': 'ما قدرنا نحدد موقعك. تقدر تحجز بدونه.',
   'Inside windows added': 'تمت إضافة تنظيف النوافذ من الداخل', 'Inside windows removed': 'تمت إزالة تنظيف النوافذ من الداخل',
   'Gleam | Instant exterior cleaning quote': 'جليم | عرض سعر فوري لتنظيف الواجهات',
-  'Build your exterior cleaning quote on your own home and book it by text or WhatsApp.': 'جهز عرض سعر تنظيف بيتك من الخارج واحجز على واتساب.'
+  'Build your exterior cleaning quote on your own home and book it here.': 'جهز عرض سعر تنظيف بيتك من الخارج واحجز من هنا.'
 };
 /* site root, so the page also works under a sub path such as GitHub Pages */
 const SITE_BASE = location.pathname.replace(/(us|uk|ie|ca|au|sa|nz)\/?(index\.html)?$/i, '').replace(/index\.html$/i, '').replace(/[^/]*$/, '');
@@ -784,7 +808,6 @@ const ICONS = {
   patio:    SVG_ICON('<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 9.2h17M3.5 14.8h17M9 3.5v5.7M15 9.2v5.6M9 14.8v5.7"/>')
 };
 const CHECK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-const CHAT = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.6a8.4 8.4 0 0 1-12.3 7.4L3.5 20.5l1.6-4.5A8.4 8.4 0 1 1 20.5 11.6z"/></svg>';
 
 const SERVICES = [
   { id: 'windows',  name: 'Windows',          desc: () => 'Glass, frames and sills' },
@@ -804,7 +827,7 @@ const state = {
   region: 'US', lang: 'en', langPicked: false, size: 'M', sel: {},
   opt: { inside: false, driveway: 'two', patio: 'medium' },
   day: 'any', time: 'any', name: '', phone: '', cc: 'US', ccTouched: false, loc: null,
-  touched: false, sending: false
+  touched: false
 };
 IDS.forEach(id => { state.sel[id] = false; });
 
@@ -826,6 +849,7 @@ const nameIn = $('#name'), phoneIn = $('#phone'), phoneHint = $('#phoneHint');
 const loc = $('#loc'), locBtn = $('#locBtn'), locX = $('#locX'), locT = $('#locT'), locS = $('#locS');
 const tiles = $('#tiles'), mapBg = $('#mapBg'), osm = $('#osm');
 const lines = $('#lines'), sumAmt = $('#sumAmt'), sumBtn = $('#sumBtn'), statusEl = $('#status');
+const bookDlg = $('#bookDlg'), bookTitle = $('#bookTitle'), bookBody = $('#bookBody'), bookSend = $('#bookSend'), bookClose = $('#bookClose');
 const stageWrap = $('#stageWrap'), stageEst = $('#stageEst'), stageAmt = $('#stageAmt');
 const bar = $('#bar'), barAmt = $('#barAmt'), barSub = $('#barSub'), barBtn = $('#barBtn');
 const detailsEl = $('#details'), regionSel = $('#region'), regionBtn = $('#regionBtn');
@@ -945,7 +969,6 @@ function syncRegionBtn() {
   regionBtn.textContent = o ? o.textContent : '';
   regionBtn.setAttribute('aria-label', (document.getElementById('regionLbl').textContent || '') + ' ' + regionBtn.textContent);
 }
-const BK = () => COPY[R().booking] || COPY.whatsapp;
 
 /* ---------- money and totals ---------- */
 const fmtCache = {};
@@ -1495,18 +1518,16 @@ function update() {
   }
 
   // buttons
-  const ok = ready(t), bk = BK();
-  heroP.textContent = tr('Tap what needs cleaning and watch the price build.') + ' ' + tr(bk.hero);
-  noteEl.textContent = tr('Based on what you picked.') + ' ' + tr(bk.note);
-  const bookLabel = state.sending ? `${CHAT}<span>${tr(bk.busy)}</span>` : `${CHAT}<span>${tr(bk.btn)}</span>`;
+  const ok = ready(t);
+  heroP.textContent = tr('Tap what needs cleaning and watch the price build.') + ' ' + tr('Book it here when it looks right.');
+  noteEl.textContent = tr('Based on what you picked.') + ' ' + tr('The final price is confirmed with you.');
+  const bookLabel = `<span>${tr('Book here')}</span>`;
   const barLabel = ok ? bookLabel : `<span>${tr('Continue')}</span>`;
   if (barBtn.innerHTML !== barLabel) barBtn.innerHTML = barLabel;
   if (sumBtn.innerHTML !== bookLabel) sumBtn.innerHTML = bookLabel;
   sumBtn.disabled = !ok;
-  if (!state.sending) {
-    statusEl.classList.remove('ok');
-    statusEl.textContent = tr(!t.n ? 'Pick at least one service to book.' : !ok ? 'Add your name and mobile number to book.' : bk.ready);
-  }
+  statusEl.classList.remove('ok');
+  statusEl.textContent = tr(!t.n ? 'Pick at least one service to book.' : !ok ? 'Add your name and mobile number to book.' : 'Sends your request from this page.');
 }
 
 /* ---------- actions ---------- */
@@ -1533,39 +1554,64 @@ function fullPhone() {
   if (raw.startsWith('+')) return raw;
   return `${country(state.cc)[2]} ${raw.replace(/^0+/, '')}`;
 }
-function buildMessage() {
-  const t = totals(), s = SIZES[state.size], B = CONFIG.bundle;
-  const wa = R().booking !== 'sms', b = x => wa ? `*${x}*` : x;
-  const A = isAr(), w = (en, ar) => A ? ar : en;
-  const L = [w(`Hi ${CONFIG.company}, I'd like to book an exterior clean.`, `مرحبا ${company()}، أبي أحجز تنظيف خارجي للبيت.`), ''];
-  L.push(`${b(w('Name:', 'الاسم:'))} ${state.name.trim()}`, `${b(w('Mobile:', 'الجوال:'))} ${A ? '\u2066' + fullPhone() + '\u2069' : fullPhone()}`, `${b(w('Home:', 'البيت:'))} ${tr(s.label)} (${tr(s.sub)})`, '', b(w('Services', 'الخدمات')));
-  t.items.forEach(it => L.push(`• ${it.label}: ${money(it.price)}`));
-  if (t.disc) L.push(w(`Bundle saving ${B.percent}%: ${money(t.disc)} off`, `خصم الباقة ${B.percent}%: ${money(t.disc)}`));
-  if (t.minApplied) L.push(`${tr('Minimum visit')}: ${money(t.min)}`);
-  L.push('', b(`${tr('Estimate')}: ${money(t.total)}`), '', `${b(w('Preferred:', 'الوقت المفضل:'))} ${dayText()}`);
-  if (state.loc) L.push(`${b(w('Location:', 'الموقع:'))} https://maps.google.com/?q=${state.loc.lat.toFixed(6)},${state.loc.lng.toFixed(6)}`);
-  return L.join('\n');
+function bookingPayload() {
+  const t = totals(), s = SIZES[state.size];
+  const phone = isAr() ? '\u2066' + fullPhone() + '\u2069' : fullPhone();
+  const location = state.loc ? `https://maps.google.com/?q=${state.loc.lat.toFixed(6)},${state.loc.lng.toFixed(6)}` : '';
+  const lines = [
+    `${tr('Your name')} ${state.name.trim()}`,
+    `${tr('Mobile number')} ${phone}`,
+    `${tr('Home type')} ${tr(s.label)} (${tr(s.sub)})`,
+    ...t.items.map(it => `${it.label} ${money(it.price)}`),
+    `${tr('Estimate')} ${money(t.total)}`,
+    `${tr('Preferred day')} ${dayText()}`
+  ];
+  if (location) lines.push(location);
+  return {
+    name: state.name.trim(),
+    phone,
+    home: `${tr(s.label)} (${tr(s.sub)})`,
+    items: t.items,
+    disc: t.disc ? money(t.disc) : '',
+    minimum: t.minApplied ? money(t.min) : '',
+    total: money(t.total),
+    when: dayText(),
+    location,
+    text: lines.join('\n')
+  };
 }
-function bookUrl() {
-  const body = encodeURIComponent(buildMessage());
-  return R().booking === 'sms' ? `sms:+${BOOKING_NUMBER}?&body=${body}` : `https://wa.me/${BOOKING_NUMBER}?text=${body}`;
+// How a request is delivered. The demo confirms on this page.
+// A client adds a function here and sets a market's booking field to its name.
+// The payload is the same: name, mobile, services, total, time, and location.
+const CHANNELS = {
+  page(payload) { showBooking(payload); }
+};
+function deliver(payload) {
+  (CHANNELS[R().booking] || CHANNELS.page)(payload);
 }
-
+function showBooking(payload) {
+  bookDlg.classList.remove('is-sent');
+  bookTitle.textContent = tr('Your request');
+  const rows = payload.items.map(it => `<div class="line"><span class="l">${it.label}</span><span class="r">${money(it.price)}</span></div>`).join('')
+    + (payload.disc ? `<div class="line soft"><span class="l">${isAr() ? `خصم الباقة ${payload.disc}` : `Bundle saving ${payload.disc}`}</span></div>` : '')
+    + (payload.minimum ? `<div class="line"><span class="l">${tr('Minimum visit')}</span><span class="r">${payload.minimum}</span></div>` : '');
+  bookBody.innerHTML = `<p class="book-person">${payload.name}</p><p class="book-person">${payload.phone}</p><p class="book-person">${payload.home}</p><div class="lines">${rows}</div><p class="book-total"><span>${tr('Estimate')}</span><strong>${payload.total}</strong></p><p class="book-when">${tr('Preferred day')} ${payload.when}</p>${payload.location ? `<p class="book-loc">${payload.location}</p>` : ''}`;
+  bookSend.hidden = false;
+  bookSend.textContent = tr('Send request');
+  bookClose.textContent = tr('Close');
+  if (!bookDlg.open) bookDlg.showModal();
+  bookSend.focus();
+}
+function showSent() {
+  bookDlg.classList.add('is-sent');
+  bookTitle.textContent = tr('Request sent');
+  bookBody.innerHTML = `<p class="book-sent">${tr('We have your name, your number and the services you picked.')}</p>`;
+  bookSend.hidden = true;
+  bookClose.textContent = tr('Close');
+  bookClose.focus();
+}
 function book() {
-  const url = bookUrl(), sms = url.startsWith('sms:');
-  const a = document.createElement('a');
-  a.href = url; if (!sms) { a.target = '_blank'; a.rel = 'noopener'; }
-  document.body.appendChild(a); a.click(); a.remove();
-  state.sending = true;
-  statusEl.textContent = BK().sent;
-  statusEl.classList.add('ok');
-  update();
-  setTimeout(() => {
-    state.sending = false;
-    update();
-    statusEl.textContent = BK().sent;
-    statusEl.classList.add('ok');
-  }, 1800);
+  deliver(bookingPayload());
 }
 
 function goDetails() {
@@ -1640,7 +1686,7 @@ function setLoc(mode, msg) {
     locS.textContent = tr('Allow location when your phone asks.');
   } else {
     locT.textContent = tr('Share my location');
-    locS.textContent = tr(msg || 'Adds a map pin to your message.');
+    locS.textContent = tr(msg || 'Adds a map pin to your request.');
   }
 }
 
@@ -1808,6 +1854,7 @@ regionSel.addEventListener('change', () => {
 
 barBtn.addEventListener('click', () => { if (ready(totals())) book(); else goDetails(); });
 sumBtn.addEventListener('click', () => { if (ready(totals())) book(); });
+bookSend.addEventListener('click', () => showSent());
 
 let ticking = false;
 function chrome() {
@@ -1980,7 +2027,7 @@ function paintLang() {
   const A = isAr(), html = document.documentElement;
   html.lang = A ? 'ar' : 'en'; html.dir = A ? 'rtl' : 'ltr';
   document.title = tr('Gleam | Instant exterior cleaning quote');
-  document.querySelector('meta[name="description"]').content = tr('Build your exterior cleaning quote on your own home and book it by text or WhatsApp.');
+  document.querySelector('meta[name="description"]').content = tr('Build your exterior cleaning quote on your own home and book it here.');
   $('#brandName').textContent = company();
   document.querySelector('.brand').setAttribute('aria-label', company());
   [['.hero h1', 'Your price, before anyone visits.'], ['#hSvc', 'What needs cleaning'], ['#hDet', 'Your details'],

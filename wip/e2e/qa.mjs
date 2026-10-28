@@ -7,15 +7,15 @@ const OUT = process.env.OUT || '/workspace/qa/exterior-quote';
 fs.mkdirSync(OUT, { recursive: true });
 const WIDTHS = [360, 390, 1280, 1440, 1920];
 const MARKETS = [
-  { path: '/us/', region: 'US', scheme: 'sms', dial: '+1', btn: 'Text us' },
-  { path: '/ca/', region: 'CA', scheme: 'sms', dial: '+1', btn: 'Text us' },
-  { path: '/uk/', region: 'UK', scheme: 'wa', dial: '+44', btn: 'Book on WhatsApp' },
-  { path: '/ie/', region: 'IE', scheme: 'wa', dial: '+353', btn: 'Book on WhatsApp' },
-  { path: '/au/', region: 'AU', scheme: 'wa', dial: '+61', btn: 'Book on WhatsApp' },
-  { path: '/nz/', region: 'NZ', scheme: 'sms', dial: '+64', btn: 'Text us' },
-  { path: '/sa/', region: 'SA', scheme: 'wa', dial: '+966', btn: 'Book on WhatsApp', sa: true },
-  { path: '/sa/', region: 'SA', scheme: 'wa', dial: '+966', btn: 'احجز على واتساب', ar: true, sa: true, key: 'sa-ar' },
-  { path: '/', region: 'US', scheme: 'sms', dial: '+1', btn: 'Text us', tz: 'America/New_York' },
+  { path: '/us/', region: 'US', dial: '+1', btn: 'Book here' },
+  { path: '/ca/', region: 'CA', dial: '+1', btn: 'Book here' },
+  { path: '/uk/', region: 'UK', dial: '+44', btn: 'Book here' },
+  { path: '/ie/', region: 'IE', dial: '+353', btn: 'Book here' },
+  { path: '/au/', region: 'AU', dial: '+61', btn: 'Book here' },
+  { path: '/nz/', region: 'NZ', dial: '+64', btn: 'Book here' },
+  { path: '/sa/', region: 'SA', dial: '+966', btn: 'Book here', sa: true },
+  { path: '/sa/', region: 'SA', dial: '+966', btn: 'احجز هنا', ar: true, sa: true, key: 'sa-ar' },
+  { path: '/', region: 'US', dial: '+1', btn: 'Book here', tz: 'America/New_York' },
 ];
 const SERVICES = ['windows', 'solar', 'gutters', 'roof', 'walls', 'driveway', 'patio'];
 let pass = 0, fail = 0; const fails = []; const messages = {};
@@ -67,6 +67,10 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   await page.waitForFunction(() => document.querySelector('.stage.gl-show'), null, { timeout: 20000 }).catch(() => {});
   await sleep(1800);
   ok(await page.evaluate(() => document.documentElement.dir) === (mk.ar ? 'rtl' : 'ltr'), `${tag} text direction`);
+  const hero = await page.$eval('#heroP', e => e.textContent);
+  ok(hero.includes(mk.ar ? 'احجز من هنا إذا ناسبك' : 'Book it here when it looks right'), `${tag} hero ${hero}`);
+  const visible = await page.evaluate(() => document.body.innerText + '\n' + document.querySelector('meta[name=description]').content);
+  ok(!/WhatsApp|wa\.me|sms:|واتساب|Text us|text message/i.test(visible), `${tag} channel words in the page`);
   if (phone || w === 1440) {
     const f = await page.evaluate(() => window.__h3d && window.__h3d.fps());
     if (phone) ok(f >= 24, `${tag} phone fps ${f}`);
@@ -156,37 +160,41 @@ for (const mk of MARKETS) for (const w of WIDTHS) {
   ok(btnTxt === mk.btn, `${tag} button "${btnTxt}"`);
   ok(!(await page.$eval('#sumBtn', e => e.disabled)), `${tag} book enabled`);
   const total = await amount(page);
-  await page.locator('#sumBtn').click(); await sleep(300);
-  const links = await page.evaluate(() => window.__links);
-  ok(links.length === 1, `${tag} one booking link`);
-  const href = links[0] || '';
   const expDial = (w === 1440 && mk.region === 'US') ? '+971' : mk.dial;
-  if (mk.scheme === 'sms') ok(href.startsWith('sms:+971500000000?&body='), `${tag} sms link ${href.slice(0, 40)}`);
-  else ok(href.startsWith('https://wa.me/971500000000?text='), `${tag} wa link ${href.slice(0, 40)}`);
-  const body = decodeURIComponent(href.split(/body=|text=/)[1] || '');
-  ok(body.includes(mk.ar ? 'مرحبا جليم' : 'Hi Gleam'), `${tag} body greeting`);
-  ok(body.includes('Yusuf'), `${tag} body name`);
-  ok(body.includes(`${expDial} ${national.replace(/^0/, '')}`), `${tag} body mobile with ${expDial}`);
-  ok(body.includes(total), `${tag} body total ${total}`);
-  ok(body.includes(mapsUrl), `${tag} body exact maps link ${mapsUrl}`);
+  await page.locator('#sumBtn').click();
+  await page.waitForSelector('#bookDlg[open]', { timeout: 5000 });
+  const body = await page.$eval('#bookDlg', e => e.innerText);
+  ok((await page.evaluate(() => window.__links)).length === 0, `${tag} stays on the page`);
+  ok(body.includes('Yusuf'), `${tag} summary name`);
+  ok(body.includes(`${expDial} ${national.replace(/^0/, '')}`), `${tag} summary mobile with ${expDial}`);
+  ok(body.includes(total), `${tag} summary total ${total}`);
+  ok(body.includes(mapsUrl), `${tag} summary maps link ${mapsUrl}`);
   const labels = mk.ar ? ['النوافذ، من الخارج والداخل', 'الألواح الشمسية', 'المزاريب', 'غسيل السطح', 'غسيل الواجهات', 'الممر والمواقف', 'الحوش والممرات'] : ['Windows, outside and inside', 'Solar panels', 'Gutters', 'Roof soft wash', 'Walls soft wash', 'Driveway', 'Patio and paths'];
-  for (const l of labels) ok(body.includes(l), `${tag} body has ${l}`);
-  ok(mk.scheme === 'sms' ? !body.includes('*') : body.includes(mk.ar ? '*التقدير' : '*Estimate'), `${tag} message formatting`);
-  if (mk.ar) ok(!/[A-Za-z]{3,}/.test(body.replace(/https?:\S+/g, '').replace('Yusuf', '')), `${tag} message all Arabic`);
-  ok(!DASH.test(body.replace(/https?:\S+/g, '')), `${tag} no dash in message`);
+  for (const l of labels) ok(body.includes(l), `${tag} summary has ${l}`);
+  if (mk.ar) ok(!/[A-Za-z]{3,}/.test(body.replace(/https?:\S+/g, '').replace('Yusuf', '')), `${tag} summary all Arabic`);
+  ok(!DASH.test(body.replace(/https?:\S+/g, '')), `${tag} no dash in summary`);
+  ok(!/WhatsApp|wa\.me|sms:|واتساب|Text us|text message/i.test(body), `${tag} summary channel words`);
+  await page.locator('#bookSend').click(); await sleep(200);
+  const sent = await page.$eval('#bookDlg', e => e.innerText);
+  ok(sent.includes(mk.ar ? 'تم إرسال الطلب' : 'Request sent'), `${tag} request sent`);
+  ok((await page.evaluate(() => window.__links)).length === 0, `${tag} sent stays on the page`);
+  await page.locator('#bookClose').click();
+  await page.waitForFunction(() => !document.querySelector('#bookDlg').open);
   messages[mk.key || mk.path] = body;
   if (mk.ar) {
     // English switch on the Saudi page
     await page.evaluate(() => scrollTo(0, 0)); await sleep(2500); await page.locator('#langSw button[data-lang="en"]').click(); await sleep(700);
     ok(await page.evaluate(() => document.documentElement.dir === 'ltr' && document.querySelector('h1').textContent.startsWith('Your price')), `${tag} EN switch`);
-    ok((await page.$eval('#sumBtn', e => e.textContent.trim())) === 'Book on WhatsApp', `${tag} EN button`);
+    ok((await page.$eval('#sumBtn', e => e.textContent.trim())) === 'Book here', `${tag} EN button`);
     ok((await amount(page)).includes('SAR'), `${tag} EN keeps SAR`);
     await dashCheck(page, tag + ' en');
     await noSideScroll(page, tag + ' en');
-    await page.evaluate(() => { window.__links = []; }); await page.locator('#sumBtn').click(); await sleep(300);
-    const b2 = decodeURIComponent(((await page.evaluate(() => window.__links[0])) || '').split('text=')[1] || '');
-    ok(b2.includes('Hi Gleam') && b2.includes('Small villa') === false || b2.includes('Medium villa'), `${tag} EN message`);
+    await page.evaluate(() => { window.__links = []; }); await page.locator('#sumBtn').click();
+    await page.waitForSelector('#bookDlg[open]', { timeout: 5000 });
+    const b2 = await page.$eval('#bookDlg', e => e.innerText);
+    ok(b2.includes('Medium villa') && b2.includes('Yusuf'), `${tag} EN summary`);
     await page.screenshot({ path: `${OUT}/sa-${w}-5-english.png` });
+    await page.locator('#bookClose').click();
     await page.locator('#langSw button[data-lang="ar"]').click(); await sleep(500);
     ok(await page.evaluate(() => document.documentElement.dir) === 'rtl', `${tag} back to Arabic`);
   }
@@ -213,9 +221,10 @@ for (const mk of MARKETS) {
   await page.locator('#locBtn').click(); await sleep(400);
   const s = await page.$eval('#locS', e => e.textContent);
   ok(!(await page.$eval('#loc', e => e.classList.contains('has'))) && (mk.ar ? /تقدر تحجز/.test(s) : /still book/.test(s)), `${mk.key || mk.path} denied note "${s}"`);
-  await page.locator('#sumBtn').click(); await sleep(300);
-  const h = await page.evaluate(() => window.__links[0] || '');
-  ok(h.startsWith(mk.scheme === 'sms' ? 'sms:+971500000000' : 'https://wa.me/971500000000') && !decodeURIComponent(h).includes('maps.google'), `${mk.key || mk.path} denied still books`);
+  await page.locator('#sumBtn').click();
+  await page.waitForSelector('#bookDlg[open]', { timeout: 5000 });
+  const h = await page.$eval('#bookDlg', e => e.innerText);
+  ok(!h.includes('maps.google') && h.includes('Omar') && (await page.evaluate(() => window.__links)).length === 0, `${mk.key || mk.path} denied still books on the page`);
   ok(errs.length === 0, `${mk.key || mk.path} denied errors ${errs}`);
   if (mk.path === '/us/' || mk.sa) await page.screenshot({ path: `${OUT}/${mk.key || mk.path.replace(/\//g, '')}-390-location-denied.png` });
   await ctx.close();
@@ -249,7 +258,8 @@ const src = fs.readFileSync(process.env.SRC || new URL('../src/index.html', impo
 const houseSrc = fs.readFileSync(new URL('../src/house3d.js', import.meta.url), 'utf8');
 ok((src.match(/971500000000/g) || []).length === 1, 'owner: placeholder number set in one place');
 ok(src.indexOf('BUSINESS SETTINGS') < src.indexOf('const SIZES'), 'owner: settings block at top of script');
-ok(/booking: 'sms'/.test(src) && /booking: 'whatsapp'/.test(src), 'owner: booking channel per market');
+ok((src.match(/booking: 'page'/g) || []).length >= 7 && /const CHANNELS/.test(src) && /function deliver/.test(src), 'owner: booking stays on the page and delivery is one function');
+ok(!/wa\.me|sms:|WhatsApp|واتساب|text message|Text us/.test(src), 'owner: no channel wording in the page');
 ok(!/prefers-color-scheme/.test(src + houseSrc), 'owner: theme does not follow the system scheme');
 ok(/color-scheme:\s*only light/.test(src) && /color-scheme:\s*only dark/.test(src), 'owner: explicit color scheme for both themes');
 ok(src.indexOf("localStorage.getItem('gleam.theme')") < src.indexOf('<style>'), 'owner: saved theme is applied before first paint');
