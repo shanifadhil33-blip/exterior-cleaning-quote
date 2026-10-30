@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="has-photo">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -37,15 +37,14 @@
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" } }
 </script>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" href="https://fonts.gstatic.com/s/schibstedgrotesk/v7/Jqz55SSPQuCQF3t8uOwiUL-taUTtap9Gayo.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../schibsted-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../schibsted-grotesk-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="../instrument-serif-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="../instrument-serif-400i.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="../backdrop.webp" as="image" type="image/webp">
 <style id="bootFont">
 @font-face{font-family:"Schibsted Grotesk Fallback";src:local("Arial"),local("Liberation Sans"),local("Helvetica"),local("Nimbus Sans"),local("DejaVu Sans"),local("Noto Sans");font-style:normal;font-weight:100 900;size-adjust:112.91%;ascent-override:86.49%;descent-override:22.83%;line-gap-override:0%}
-@font-face{font-family:"Schibsted Grotesk";font-style:normal;font-weight:400 800;font-display:optional;src:url("https://fonts.gstatic.com/s/schibstedgrotesk/v7/Jqz55SSPQuCQF3t8uOwiUL-taUTtap9Gayo.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
-@font-face{font-family:"Schibsted Grotesk";font-style:normal;font-weight:400 800;font-display:optional;src:url("https://fonts.gstatic.com/s/schibstedgrotesk/v7/Jqz55SSPQuCQF3t8uOwiUL-taUTtap9Iayoxdg.woff2") format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"Schibsted Grotesk";font-style:normal;font-weight:400 800;font-display:block;src:url("../schibsted-grotesk-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Schibsted Grotesk";font-style:normal;font-weight:400 800;font-display:block;src:url("../schibsted-grotesk-latin-ext.woff2") format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
 @font-face{font-family:"Instrument Serif Fallback";src:local("Georgia"),local("Times New Roman"),local("Liberation Serif");font-style:normal;font-weight:400;size-adjust:112%;ascent-override:92%;descent-override:22%;line-gap-override:0%}
 @font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:block;src:url("../instrument-serif-400.woff2") format("woff2")}
 @font-face{font-family:"Instrument Serif";font-style:italic;font-weight:400;font-display:block;src:url("../instrument-serif-400i.woff2") format("woff2")}
@@ -530,8 +529,8 @@ html[data-theme="dark"]{
   --accent:#0F6E56;
   --on-accent:#FFFFFF;
 }
-html,body{background-color:#F3F1EC;overflow-x:clip}
-html[data-theme="dark"],html[data-theme="dark"] body{background-color:#121614}
+html,body{background-color:#F3F1EC;background-image:radial-gradient(ellipse 130% 26% at 50% -6%, #E4EFE8 0%, rgba(243,241,236,0) 100%);overflow-x:clip}
+html[data-theme="dark"],html[data-theme="dark"] body{background-color:#121614;background-image:radial-gradient(ellipse 130% 26% at 50% -6%, #1A2A24 0%, rgba(18,22,20,0) 100%)}
 body::before{background:#F3F1EC}
 html[data-theme="dark"] body::before{background:#121614}
 .page{max-width:1120px}
@@ -562,33 +561,20 @@ html[data-theme="dark"] body::before{background:#121614}
 .btn.quiet:active{transform:none}
 .risk{margin-top:4px;font-size:13px;color:var(--muted)}
 .stage-wrap{background:var(--bg);overflow:clip}
-.stage{background:transparent;overflow:clip}
-.stage-bg{position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 70% 58% at 50% 46%, rgba(176,206,190,.9) 0%, rgba(243,241,236,0) 72%)}
-html.has-photo:not([data-theme="dark"]) .stage-bg{
-  background-image:url("../backdrop.webp");
-  background-position:center 42%;
-  background-size:cover;
-  background-repeat:no-repeat;
-  -webkit-mask-image:radial-gradient(ellipse 72% 64% at 50% 48%, #000 28%, transparent 74%);
-  mask-image:radial-gradient(ellipse 72% 64% at 50% 48%, #000 28%, transparent 74%);
-}
-html[data-theme="dark"] .stage-bg{
-  background:radial-gradient(ellipse 68% 56% at 50% 46%, rgba(31,78,64,.95) 0%, rgba(18,22,20,0) 72%);
-  -webkit-mask-image:none;
-  mask-image:none;
-}
+.stage{background:var(--bg);overflow:clip}
+.stage-bg{position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 78% 64% at 50% 44%, rgba(214,226,216,.45) 0%, rgba(243,241,236,0) 74%)}
+html[data-theme="dark"] .stage-bg{background:radial-gradient(ellipse 78% 64% at 50% 46%, rgba(32,64,52,.5) 0%, rgba(18,22,20,0) 74%)}
 .stage .house,.stage .stage-foot{position:relative;z-index:1}
-.stage .gl3{z-index:1;background:transparent !important;background-color:transparent !important}
+.stage .gl3{z-index:1}
+.left > .block:first-child{margin-top:14px}
 .stage-est{display:none !important}
 .stage-foot{padding:2px 8px 6px;min-height:0}
 .caption{min-height:0}
-.bar{transform:none}
+.bar{transform:none;background:#F3F1EC;background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
 .bar-k{display:none}
 .bar-amt{font-size:28px}
 .bar .btn{height:48px;padding:0 16px;font-size:15px}
 .foot p{margin:0}
-.foot p + p{margin-top:6px}
-html:not(.has-photo) #footCredit,html[data-theme="dark"] #footCredit{display:none}
 dialog.book.is-sent .book-close{background:var(--accent);color:var(--on-accent)}
 html.gl-wait .house{height:min(calc(100cqi / 1.35),50svh)}
 @media (max-width:959px){
@@ -600,19 +586,26 @@ html.gl-wait .house{height:min(calc(100cqi / 1.35),50svh)}
   .hero h1{font-size:36px}
 }
 @media (min-width:960px){
-  .page{padding:0 48px 96px}
-  .narrow{max-width:720px}
-  .hero{display:flex;flex-direction:column;align-items:center;gap:0;padding:52px 0 0;grid-template-columns:none}
-  .hero h1{font-size:72px;max-width:12em}
-  .hero p{margin:10px auto 0}
-  .layout{display:block}
+  html,body{background-image:radial-gradient(ellipse 42% 88% at -8% 18%, #E3EEE7 0%, rgba(243,241,236,0) 100%)}
+  html[data-theme="dark"],html[data-theme="dark"] body{background-image:radial-gradient(ellipse 42% 88% at -8% 18%, #1B2B25 0%, rgba(18,22,20,0) 100%)}
+  .page{max-width:1360px;padding:0 40px 80px}
+  .narrow{max-width:none;margin:0}
+  .desk{display:grid;grid-template-columns:minmax(0,.86fr) minmax(0,1.14fr);column-gap:40px;align-items:start}
+  .hero{grid-column:1;grid-row:1;display:flex;flex-direction:column;align-items:flex-start;text-align:start;gap:0;padding:28px 0 0}
+  .hero h1{font-size:clamp(56px,4.4vw,76px);max-width:9.5em;margin-inline:0}
+  .hero p{margin:12px 0 0}
+  .hero-actions{margin:16px 0 0;width:min(100%,380px)}
+  .layout{grid-column:1;grid-row:2;display:block;margin-top:8px}
   .left,.right{display:block}
   .left{position:static;top:auto}
-  .stage-wrap,.stage-wrap.away{position:static;max-width:980px;margin:8px auto 0;padding:0;background:transparent;transform:none;opacity:1;pointer-events:auto}
-  .right{max-width:720px;margin:8px auto 0}
-  .right > .block:first-child{margin-top:28px}
+  .left > .block:first-child{margin-top:22px}
+  .stage-wrap,.stage-wrap.away{grid-column:2;grid-row:1 / span 2;align-self:start;position:sticky;top:16px;max-width:none;margin:0;padding:0;background:transparent;transform:none;opacity:1;pointer-events:auto;overflow:visible}
+  .right{max-width:none;margin:0}
+  .right > .block:first-child{margin-top:8px}
   .bar{display:none}
-  [dir="rtl"] .hero,[dir="rtl"] .layout{direction:rtl}
+  html.gl-wait .house{height:min(calc(100cqi / 1.02),82svh)}
+  [dir="rtl"] .desk{direction:rtl}
+  [dir="rtl"] .hero,[dir="rtl"] .layout,[dir="rtl"] .right,[dir="rtl"] .foot{direction:rtl}
   html.has-ar .hero h1{min-height:0}
 }
 </style>
@@ -631,6 +624,7 @@ html.gl-wait .house{height:min(calc(100cqi / 1.35),50svh)}
     </div>
   </header>
 
+  <div class="desk">
   <section class="hero narrow">
     <h1><span id="h1a">Your price, </span><em id="h1b">ready</em><span id="h1c"> to book.</span></h1>
     <p class="trust" id="heroP">The total updates as you tap the house.</p>
@@ -642,19 +636,19 @@ html.gl-wait .house{height:min(calc(100cqi / 1.35),50svh)}
     <p class="risk" id="heroRisk">The final price is confirmed with you.</p>
   </section>
 
+  <div class="stage-wrap" id="stageWrap">
+    <div class="stage">
+      <div class="stage-bg" aria-hidden="true"></div>
+      <svg id="house" class="house" viewBox="0 0 400 270" role="group" aria-label="Your home. Tap a part to add it to your quote."><g id="scene"></g><g id="fx"></g></svg>
+      <div class="stage-foot">
+        <p class="caption" id="caption" aria-live="polite">Tap any part of your home to add it</p>
+        <p class="stage-est zero" id="stageEst"><span>Estimate</span><strong id="stageAmt">$0</strong></p>
+      </div>
+    </div>
+  </div>
+
   <main class="layout narrow">
     <div class="left">
-      <div class="stage-wrap" id="stageWrap">
-        <div class="stage">
-          <!-- House photograph: Unsplash photo xEgqxQYz3jA by CrowN, Unsplash License. -->
-          <div class="stage-bg" aria-hidden="true"></div>
-          <svg id="house" class="house" viewBox="0 0 400 270" role="group" aria-label="Your home. Tap a part to add it to your quote."><g id="scene"></g><g id="fx"></g></svg>
-          <div class="stage-foot">
-            <p class="caption" id="caption" aria-live="polite">Tap any part of your home to add it</p>
-            <p class="stage-est zero" id="stageEst"><span>Estimate</span><strong id="stageAmt">$0</strong></p>
-          </div>
-        </div>
-      </div>
       <section class="block" aria-labelledby="hSize">
         <h2 class="h2" id="hSize">Home size</h2>
         <div class="seg" id="sizeSeg" role="group" aria-labelledby="hSize"></div>
@@ -707,8 +701,9 @@ html.gl-wait .house{height:min(calc(100cqi / 1.35),50svh)}
       </section>
     </div>
   </main>
+  </div>
 
-  <footer class="foot narrow"><p id="footNote">Demo page with sample prices.</p><p id="footCredit">House photograph by CrowN on Unsplash.</p></footer>
+  <footer class="foot narrow"><p id="footNote">Demo page with sample prices.</p></footer>
 </div>
 
 <dialog class="book" id="bookDlg" aria-labelledby="bookTitle">
@@ -1160,19 +1155,24 @@ function setMoney(el, n) {
   }
   el.replaceChildren(frag);
 }
-function tween(el, to) {
-  const from = el._cur || 0;
-  cancelAnimationFrame(el._raf);
-  if (reduced || from === to) { el._cur = to; setMoney(el, to); return; }
+const moneyEls = () => [heroAmt, barAmt, stageAmt, sumAmt];
+let moneyCur = 0, moneyRaf = 0;
+function paintMoney(n) {
+  moneyCur = n;
+  for (const el of moneyEls()) { el._cur = n; setMoney(el, n); }
+}
+function tweenMoney(to) {
+  const from = moneyCur;
+  cancelAnimationFrame(moneyRaf);
+  if (reduced || from === to) { paintMoney(to); return; }
   const t0 = performance.now(), dur = 600;
   const step = now => {
     const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
-    el._cur = Math.round(from + (to - from) * e);
-    setMoney(el, el._cur);
-    if (p < 1) el._raf = requestAnimationFrame(step);
+    paintMoney(Math.round(from + (to - from) * e));
+    if (p < 1) moneyRaf = requestAnimationFrame(step);
   };
-  el._raf = requestAnimationFrame(step);
-  if (el === barAmt) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  moneyRaf = requestAnimationFrame(step);
+  barAmt.classList.remove('bump'); void barAmt.offsetWidth; barAmt.classList.add('bump');
 }
 
 /* ---------- the house ---------- */
@@ -1403,42 +1403,15 @@ const spec3d = () => { const z = SIZES[state.size]; return { floors: z.floors, b
 function load3d() {
   if (new URLSearchParams(location.search).has('flat')) return;
   const stage = svg.parentElement;
-  const grainP = new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = siteAsset + 'premium/grain.webp';
-  });
-  Promise.all([import(siteAsset + 'house3d.js'), grainP]).then(([m, grain]) => {
-    H3 = m.mount(stage, { onTap: id => toggle(id), grade: 'premium', grain: grain || undefined });
+  import(siteAsset + 'house3d.js').then(m => {
+    H3 = m.mount(stage, { onTap: id => toggle(id), grade: 'premium' });
     stage.insertBefore(H3.canvas, svg);
     H3.setSel(state.sel);
     H3.build(spec3d());
-    stage.classList.add('gl-on');
+    stage.classList.add('gl-on', 'gl-show');
     document.documentElement.classList.remove('gl-wait');
     window.__h3d = H3;
-    // The first presented WebGL frame is a long GPU hitch. Hold the canvas
-    // almost invisible through that, then fade it in over 300ms.
-    const canvas = H3.canvas;
-    const dur = reduced ? 1 : 300;
-    canvas.style.opacity = '0.001';
-    let warm = 3;
-    const start = () => {
-      if (warm-- > 0) { requestAnimationFrame(start); return; }
-      const t0 = performance.now();
-      const step = now => {
-        const u = Math.min(1, (now - t0) / dur);
-        canvas.style.opacity = String(0.001 + 0.999 * u);
-        if (u < 1) requestAnimationFrame(step);
-        else {
-          stage.classList.add('gl-show');
-          canvas.style.opacity = '';
-          if (H3.settleFps) H3.settleFps();
-        }
-      };
-      requestAnimationFrame(step);
-    };
-    requestAnimationFrame(start);
+    if (H3.settleFps) H3.settleFps();
   }).catch(err => { H3 = null; document.documentElement.classList.remove('gl-wait'); window.__h3dError = String(err && err.message || err); });
 }
 function renderHouse(animate) {
@@ -1652,7 +1625,7 @@ function update() {
   }
 
   // amounts
-  tween(barAmt, t.total); tween(stageAmt, t.total); tween(sumAmt, t.total); tween(heroAmt, t.total);
+  tweenMoney(t.total);
   stageEst.classList.toggle('zero', t.n === 0);
   bar.classList.add('show');
   const A2 = isAr();
@@ -2219,7 +2192,7 @@ function paintLang() {
   setCaption(tr('Tap any part of your home to add it'));
   renderSizes(); renderTimes(); renderCountries(); renderList(); renderDays();
   setLoc(state.loc ? 'has' : 'idle');
-  for (const el of [barAmt, stageAmt, sumAmt, heroAmt]) setMoney(el, el._cur || 0);
+  paintMoney(moneyCur);
   update();
 }
 function applyLang() {

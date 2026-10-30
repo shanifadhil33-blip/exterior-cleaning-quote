@@ -35,12 +35,11 @@ export function mount(host, opts = {}) {
   // Three r170 ignores the alpha flag and always requests alpha:true. Create the context
   // here so the renderer is given the attributes we actually asked for.
   const requestedGL = { alpha: false, antialias: true, depth: true, stencil: false, powerPreference: 'high-performance', premultipliedAlpha: true, preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false };
-  if (premium) requestedGL.alpha = true;
   const glContext = canvas.getContext('webgl2', requestedGL);
   if (!glContext) throw new Error('no webgl');
   const renderer = new THREE.WebGLRenderer({ canvas, context: glContext, antialias: true, alpha: requestedGL.alpha, powerPreference: 'high-performance', stencil: false });
   const gl = renderer.getContext();
-  renderer.setClearAlpha(premium ? 0 : 1);
+  renderer.setClearAlpha(1);
   const dprCap = 2;
   const msaa = !!(gl.getContextAttributes() && gl.getContextAttributes().antialias);
   // Screens around dpr 1 leave roof eaves and window bars only a pixel wide.
@@ -97,6 +96,8 @@ export function mount(host, opts = {}) {
   const BG_DARK = new THREE.Color(0x121618);
   const LAWN_LIGHT = new THREE.Color(0xc5d0c8);
   const LAWN_DARK = new THREE.Color(0x24312c);
+  const PREM_LAWN_LIGHT = new THREE.Color(0xe7eee4);
+  const PREM_LAWN_DARK = new THREE.Color(0x121614);
   const lawnCur = new THREE.Color(0xc5d0c8);
   scene.background = bgCur;
   scene.fog = new THREE.Fog(0xeceeee, 8000, 12000);
@@ -117,8 +118,9 @@ export function mount(host, opts = {}) {
       sun.intensity = (0.38 - 0.04 * (1 - t)) * PI;
       fill.color.set(0xd9e6ee);
       fill.intensity = (0.34 + 0.1 * (1 - t)) * PI;
-      contactU.value = 0.24 + 0.1 * (1 - t);
-      lawnCur.copy(LAWN_DARK).lerp(new THREE.Color(0xd7e3d8), t);
+      contactU.value = 0.10 + 0.06 * (1 - t);
+      // Stay close to the page colour so the ground reads as a soft shadow, not a disc.
+      lawnCur.copy(PREM_LAWN_DARK).lerp(PREM_LAWN_LIGHT, t);
       return;
     }
     hemi.color.set(0xffffff);
@@ -134,18 +136,7 @@ export function mount(host, opts = {}) {
     lawnCur.copy(LAWN_DARK).lerp(LAWN_LIGHT, t);
   }
   function paintBackdrop(cssColor) {
-    if (premium) {
-      const raw = cssColor || (themeDark() ? '#121614' : '#f3f1ec');
-      bgCur.set(raw);
-      renderer.setClearColor(0x000000, 0);
-      scene.background = null;
-      if (scene.fog) scene.fog.color.copy(bgCur);
-      canvas.style.backgroundColor = 'transparent';
-      applySceneTheme();
-      draw();
-      return;
-    }
-    const raw = cssColor || (themeDark() ? '#121618' : '#eceeee');
+    const raw = cssColor || (themeDark() ? (premium ? '#121614' : '#121618') : (premium ? '#f3f1ec' : '#eceeee'));
     bgCur.set(raw);
     renderer.setClearColor(bgCur, 1);
     scene.fog.color.copy(bgCur);
@@ -286,29 +277,6 @@ export function mount(host, opts = {}) {
     return mat;
   }
   const lawnMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
-  if (premium) {
-    // The page canvas is premultiplied. This material writes that itself.
-    lawnMat.premultipliedAlpha = false;
-    lawnMat.customProgramCacheKey = () => 'gleam-lawn-float';
-    lawnMat.onBeforeCompile = shader => {
-      shader.uniforms.uLawn = { value: lawnCur };
-      shader.uniforms.uContact = contactU;
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vLawn;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLawn = position.xy;');
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vLawn;\nuniform vec3 uLawn;\nuniform float uContact;')
-        .replace('#include <fog_fragment>', `#include <fog_fragment>
-        float rad = length(vLawn) * 2.0;
-        float fade = smoothstep(0.16, 0.62, rad);
-        float contact = 1.0 - smoothstep(0.0, 0.36, rad);
-        vec3 lawnLin = max(uLawn, vec3(0.0));
-        vec3 lawnSRGB = mix(lawnLin * 12.92, 1.055 * pow(lawnLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), lawnLin));
-        lawnSRGB *= 1.0 - uContact * contact;
-        float alpha = 1.0 - fade;
-        gl_FragColor = vec4(lawnSRGB * alpha, alpha);`);
-    };
-  } else {
   lawnMat.customProgramCacheKey = () => 'gleam-lawn';
   lawnMat.onBeforeCompile = shader => {
     shader.uniforms.uBg = { value: bgCur };
@@ -330,7 +298,6 @@ export function mount(host, opts = {}) {
         lawnSRGB *= 1.0 - uContact * contact;
         gl_FragColor.rgb = mix(lawnSRGB, bgSRGB, fade);`);
   };
-  }
   function grime(p, mesh, mode) {
     mesh.renderOrder = 4;
     mesh.userData.mode = mode;
@@ -367,8 +334,8 @@ export function mount(host, opts = {}) {
     if (premium) {
       C.wall = '#f4f1eb';
       C.wallDirty = '#c9b89a';
-      C.roof = '#6a635b';
-      C.roofDirty = '#514c44';
+      C.roof = '#7a868f';
+      C.roofDirty = '#3c4650';
       C.pave = '#d5cfc5';
       C.paveDirty = '#b3a690';
       C.gut = '#e4ded4';
@@ -607,7 +574,7 @@ export function mount(host, opts = {}) {
 
     // roof, dropped into the wall so the soffit is not coplanar with the wall top
     const pr = part('roof');
-    const roofMat = dirtyMat(pr, C.roofDirty, C.roof, { roughness: 0.9, flatShading: true });
+    const roofMat = dirtyMat(pr, C.roofDirty, C.roof, { roughness: premium ? 0.64 : 0.9, metalness: premium ? 0.05 : 0, flatShading: true });
     const RH = 0.85, RD = Dp + 0.3, RW = W + 0.3;
     const roofSink = 0.05;
     let slope = 0;
@@ -639,7 +606,7 @@ export function mount(host, opts = {}) {
       pr.g.add(pickEither(roof));
       if (gw) { const gr = gable(gw + 0.36, gDepth + 0.4, 0.48, roofMat); gr.position.set(gx, 0.96, gZ); pr.g.add(pickEither(gr)); }
       slope = Math.atan2(RH, RD / 2);
-      const mossMat = new THREE.MeshStandardMaterial({ color: col('#7f8f62'), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
+      const mossMat = new THREE.MeshStandardMaterial({ color: col(premium ? '#6d7b62' : '#7f8f62'), roughness: 1, flatShading: true, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 });
       const ny = Math.cos(slope), nz = Math.sin(slope);
       for (let i = 0; i < 13 + s.bays * 3; i++) {
         const t = 0.15 + r() * 0.75, z = (RD / 2) * (1 - t), y = H - roofSink + RH * t;
@@ -657,7 +624,7 @@ export function mount(host, opts = {}) {
     // Chimney, embedded in the roof so the join is closed from every side.
     {
       const chim = dirtyMat(pr, C.wallDirty, C.wall, { roughness: 0.94 });
-      const cap = dirtyMat(pr, C.roofDirty, C.roof, { roughness: 0.9, flatShading: true });
+      const cap = dirtyMat(pr, C.roofDirty, C.roof, { roughness: premium ? 0.64 : 0.9, metalness: premium ? 0.05 : 0, flatShading: true });
       const cx = x0 + Math.min(0.7, W * 0.22);
       const ch = 0.58;
       const cy = flat ? H + 0.16 + ch / 2 : H - roofSink + RH * 0.62;
@@ -1078,11 +1045,15 @@ export function mount(host, opts = {}) {
     const bb = new THREE.Box3().setFromObject(p.g);
     if (bb.isEmpty()) return;
     const size = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
-    const sheet = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
     const horiz = size.y < 0.25;
-    if (horiz) { sheet.rotation.x = -Math.PI / 2; sheet.scale.set(0.35, size.z + 0.2, 1); }
-    else sheet.scale.set(size.x + 0.2, 0.3, 1);
-    root.add(sheet);
+    // The additive sheet is a pale card on the premium house. Spray stays.
+    let sheet = null;
+    if (!premium) {
+      sheet = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      if (horiz) { sheet.rotation.x = -Math.PI / 2; sheet.scale.set(0.35, size.z + 0.2, 1); }
+      else sheet.scale.set(size.x + 0.2, 0.3, 1);
+      root.add(sheet);
+    }
     const N = 70, pos = new Float32Array(N * 3), vel = [];
     for (let i = 0; i < N; i++) vel.push(new THREE.Vector3((noise() - 0.5) * 1.4, noise() * 1.6 + 0.4, noise() * 1.2));
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -1106,17 +1077,17 @@ export function mount(host, opts = {}) {
         return true;
       }
       if (t >= 1) {
-        root.remove(f.sheet, f.pts); f.sheet.geometry.dispose(); f.sheet.material.dispose(); f.pts.geometry.dispose(); f.pts.material.dispose();
+        if (f.sheet) { root.remove(f.sheet); f.sheet.geometry.dispose(); f.sheet.material.dispose(); }
+        root.remove(f.pts); f.pts.geometry.dispose(); f.pts.material.dispose();
         f.p.mats.forEach(m => m.emissive && m.emissive.setScalar(0));
         return false;
       }
       const a = Math.sin(Math.PI * Math.min(1, t * 1.2));
-      // A faint streak only. The colour change itself is the 520ms fade.
-      f.sheet.material.opacity = 0.12 * a;
       let lx, ly, lz;
       if (f.horiz) { lx = f.bb.min.x + (f.size.x + 0.4) * t - 0.2; ly = f.bb.max.y + 0.03; lz = f.ctr.z; }
       else { lx = f.ctr.x; ly = f.bb.max.y - (f.size.y + 0.2) * t; lz = f.bb.max.z + 0.05; }
-      f.sheet.position.set(lx, ly, lz);
+      // A faint streak only. The colour change itself is the 520ms fade.
+      if (f.sheet) { f.sheet.material.opacity = 0.12 * a; f.sheet.position.set(lx, ly, lz); }
       const arr = f.pts.geometry.attributes.position.array;
       for (let i = 0; i < f.vel.length; i++) {
         const age = Math.max(0, t * 1.3 - (i / f.vel.length) * 0.5), v = f.vel[i];
@@ -1469,7 +1440,7 @@ export function mount(host, opts = {}) {
     // Phone: a taller stage narrows the horizontal view so the front of the
     // house can fill the width without the top-down orbit leaving the frame.
     const h = Math.round(premium
-      ? (wide ? Math.min(w / 1.35, vh * 0.5) : Math.min(w / 1.18, vh * 0.42))
+      ? (wide ? Math.min(w / 1.02, vh * 0.82) : Math.min(w / 1.18, vh * 0.42))
       : (wide ? Math.min(w / 1.12, vh * 0.74) : Math.min(w / 1.18, vh * 0.48)));
     // A language switch can notify the observer without changing the drawing size.
     // Skip that so the camera is not framed again. A real rebuild still reframes.

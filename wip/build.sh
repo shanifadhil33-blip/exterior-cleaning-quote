@@ -12,5 +12,5 @@ for d in us uk ie ca au nz sa; do
   mkdir -p "dist/premium/$d"
   cp src/premium.html "dist/premium/$d/index.html"
 done
-cp src/premium-assets/*.woff2 src/premium-assets/*.webp src/premium-assets/OFL.txt dist/premium/
+cp src/premium-assets/*.woff2 src/premium-assets/*.webp src/premium-assets/*.txt dist/premium/
 echo built

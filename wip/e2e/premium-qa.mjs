@@ -61,31 +61,55 @@ async function drawLoopMs(page, turns) {
   }, turns);
 }
 
+async function openLive(width, height) {
+  const phone = width < 960;
+  const ctx = await browser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: phone ? 2 : 1,
+    hasTouch: phone,
+    isMobile: phone,
+    timezoneId: 'Europe/London',
+  });
+  const page = await ctx.newPage();
+  await page.goto(LIVE + '/uk/', { waitUntil: 'commit', timeout: 60000 });
+  await ready(page);
+  return { ctx, page };
+}
+
 console.log('fps');
 {
-  const { ctx, page } = await openPrem(390, 800);
-  const plain = await drawLoopMs(page, 40);
-  const plainFps = Math.round(40000 / plain);
-  const client = await ctx.newCDPSession(page);
-  await client.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-  await page.evaluate(async () => {
-    for (let i = 0; i < 8; i++) {
-      window.__h3d.setYaw(i * 0.2);
-      await new Promise(r => requestAnimationFrame(r));
-    }
+  const prem = await openPrem(390, 800);
+  const premMs = await drawLoopMs(prem.page, 40);
+  const faces = await prem.page.evaluate(async () => {
+    await document.fonts.load('500 32px "Schibsted Grotesk"');
+    const probe = document.createElement('span');
+    probe.textContent = 'Tap the house to start';
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;font:500 32px "Schibsted Grotesk",sans-serif;white-space:nowrap';
+    document.body.appendChild(probe);
+    const own = probe.getBoundingClientRect().width;
+    probe.style.fontFamily = 'Arial, sans-serif';
+    const arial = probe.getBoundingClientRect().width;
+    probe.remove();
+    return {
+      loaded: document.fonts.check('500 16px "Schibsted Grotesk"'),
+      own, arial,
+      hosted: !document.documentElement.outerHTML.includes('fonts.gstatic.com'),
+      alpha: window.__h3d.contextAttributes().alpha,
+    };
   });
-  await page.evaluate(() => document.documentElement.classList.add('has-photo'));
-  const withPhoto = await drawLoopMs(page, 24);
-  await page.evaluate(() => document.documentElement.classList.remove('has-photo'));
-  const noPhoto = await drawLoopMs(page, 24);
-  await client.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-  const fpsPhoto = Math.round(24000 / withPhoto);
-  const fpsGrad = Math.round(24000 / noPhoto);
-  console.log(JSON.stringify({ plainFps, fpsPhoto, fpsGrad }));
-  fs.writeFileSync(`${OUT}/fps.json`, JSON.stringify({ plainFps, withPhoto, noPhoto, fpsPhoto, fpsGrad }));
-  ok(plainFps >= 24, `390 fps ${plainFps}`);
-  ok(fpsPhoto + 8 >= fpsGrad, `photo fps ${fpsPhoto} vs gradient ${fpsGrad}`);
-  await ctx.close();
+  await prem.ctx.close();
+  const live = await openLive(390, 800);
+  const liveMs = await drawLoopMs(live.page, 40);
+  await live.ctx.close();
+  const premFps = Math.round(40000 / premMs);
+  const liveFps = Math.round(40000 / liveMs);
+  console.log(JSON.stringify({ premFps, liveFps, faces }));
+  fs.writeFileSync(`${OUT}/fps.json`, JSON.stringify({ premFps, liveFps, premMs, liveMs, faces }));
+  ok(premFps >= 24, `390 fps ${premFps}`);
+  ok(premFps + 1 >= liveFps * 0.85, `390 fps ${premFps} vs live ${liveFps}`);
+  ok(faces.loaded && Math.abs(faces.own - faces.arial) > 1, `Schibsted loaded ${faces.own} vs Arial ${faces.arial}`);
+  ok(faces.hosted, 'body font is self hosted');
+  ok(faces.alpha === false, `premium canvas opaque ${faces.alpha}`);
 }
 
 console.log('first screen, fonts, flicker, taps, booking');
@@ -109,6 +133,7 @@ console.log('first screen, fonts, flicker, taps, booking');
       scroll: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
       seen: ['h1', '#heroAmt', '#heroBtn', '#bar', '#barAmt', '#barBtn', 'canvas.gl3'].every(inView),
       alpha: window.__h3d.contextAttributes().alpha,
+      body: getComputedStyle(document.body).fontFamily,
     };
   });
   ok(info.roman && info.italicReady, `display font ready ${info.font}`);
@@ -118,7 +143,8 @@ console.log('first screen, fonts, flicker, taps, booking');
   ok(info.amt.includes('0'), `hero total ${info.amt}`);
   ok(info.scroll, '390 no sideways scroll');
   ok(info.seen, '390 price and house in the first screen');
-  ok(info.alpha === true, 'premium canvas alpha');
+  ok(info.alpha === false, 'premium canvas opaque');
+  ok(/Schibsted Grotesk/.test(info.body), `body face ${info.body}`);
   ok(errors.length === 0, `page errors ${errors.join(' | ')}`);
 
   const text = await page.evaluate(() => document.body.innerText + '\n' + document.title);
@@ -141,7 +167,18 @@ console.log('first screen, fonts, flicker, taps, booking');
   const back = await page.evaluate(() => window.__h3d.project('roof'));
   ok(!!back, 'back roof has a tap point');
   if (back) await page.touchscreen.tap(back.x, back.y);
-  await sleep(200);
+  const money = await page.evaluate(async () => {
+    let bad = 0;
+    for (let i = 0; i < 18; i++) {
+      await new Promise(r => requestAnimationFrame(r));
+      const a = document.querySelector('#heroAmt').textContent;
+      const b = document.querySelector('#barAmt').textContent;
+      const c = document.querySelector('#sumAmt').textContent;
+      if (a !== b || a !== c) bad++;
+    }
+    return { bad, hero: document.querySelector('#heroAmt').textContent, bar: document.querySelector('#barAmt').textContent };
+  });
+  ok(money.bad === 0, `totals stay together ${money.bad} ${money.hero} vs ${money.bar}`);
   ok(await page.$eval('#house', e => e.classList.contains('c-roof')), 'back roof selects');
 
   await page.evaluate(() => window.__h3d.setYaw(0.6));
@@ -191,6 +228,28 @@ console.log('arabic accent');
   await ctx.close();
 }
 
+console.log('desktop frame and flicker');
+{
+  const { ctx, page } = await openPrem(1440, 900);
+  const box = await page.evaluate(() => {
+    const c = document.querySelector('canvas.gl3').getBoundingClientRect();
+    const h = document.querySelector('h1').getBoundingClientRect();
+    return { cw: Math.round(c.width), ch: Math.round(c.height), hx: Math.round(h.x), cx: Math.round(c.x) };
+  });
+  ok(box.cw >= 520 && box.ch >= 520, `desktop house ${box.cw}x${box.ch}`);
+  ok(box.cx > box.hx + 200, `house sits to the right of the headline ${box.hx} ${box.cx}`);
+  for (const y of [0.4, Math.PI, 2.2]) {
+    await page.evaluate(yy => window.__h3d.setYaw(yy), y);
+    await sleep(80);
+    const a = await page.locator('canvas.gl3').screenshot();
+    const b = await page.locator('canvas.gl3').screenshot();
+    const A = PNG.sync.read(a), B = PNG.sync.read(b);
+    const n = pixelmatch(A.data, B.data, null, A.width, A.height, { threshold: 0.1 });
+    ok(n === 0, `1440 flicker at yaw ${y.toFixed(2)} pixels ${n}`);
+  }
+  await ctx.close();
+}
+
 console.log('dark desktop');
 {
   const { ctx, page } = await openPrem(1440, 900, { theme: 'dark' });
@@ -213,6 +272,7 @@ async function shotLive(base, path, width, theme) {
   const page = await ctx.newPage();
   await page.goto(base + path, { waitUntil: 'commit', timeout: 60000 });
   await ready(page);
+  await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
   await sleep(200);
   const buf = await page.screenshot();
   await ctx.close();
