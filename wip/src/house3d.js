@@ -11,6 +11,17 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 const col = c => new THREE.Color(c.startsWith('rgba') ? c.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)/, 'rgb($1,$2,$3)') : c);
 
 export function mount(host, opts = {}) {
+  const premium = opts.grade === 'premium';
+  let grainTex = null;
+  if (premium && opts.grain) {
+    grainTex = new THREE.Texture(opts.grain);
+    grainTex.wrapS = grainTex.wrapT = THREE.RepeatWrapping;
+    grainTex.colorSpace = THREE.NoColorSpace;
+    grainTex.generateMipmaps = true;
+    grainTex.minFilter = THREE.LinearMipmapLinearFilter;
+    grainTex.magFilter = THREE.LinearFilter;
+    grainTex.needsUpdate = true;
+  }
   const probe = document.createElement('canvas');
   const probeAttrs = { alpha: false, antialias: false, powerPreference: 'high-performance' };
   const probeGl = probe.getContext('webgl2', probeAttrs) || probe.getContext('webgl', probeAttrs);
@@ -24,11 +35,12 @@ export function mount(host, opts = {}) {
   // Three r170 ignores the alpha flag and always requests alpha:true. Create the context
   // here so the renderer is given the attributes we actually asked for.
   const requestedGL = { alpha: false, antialias: true, depth: true, stencil: false, powerPreference: 'high-performance', premultipliedAlpha: true, preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false };
+  if (premium) requestedGL.alpha = true;
   const glContext = canvas.getContext('webgl2', requestedGL);
   if (!glContext) throw new Error('no webgl');
-  const renderer = new THREE.WebGLRenderer({ canvas, context: glContext, antialias: true, alpha: false, powerPreference: 'high-performance', stencil: false });
+  const renderer = new THREE.WebGLRenderer({ canvas, context: glContext, antialias: true, alpha: requestedGL.alpha, powerPreference: 'high-performance', stencil: false });
   const gl = renderer.getContext();
-  renderer.setClearAlpha(1);
+  renderer.setClearAlpha(premium ? 0 : 1);
   const dprCap = 2;
   const msaa = !!(gl.getContextAttributes() && gl.getContextAttributes().antialias);
   // Screens around dpr 1 leave roof eaves and window bars only a pixel wide.
@@ -97,6 +109,18 @@ export function mount(host, opts = {}) {
   }
   function applySceneTheme() {
     const t = themeMix();
+    if (premium) {
+      hemi.color.set(0xfff7f0);
+      hemi.groundColor.set(0xaeb8ae);
+      hemi.intensity = (0.56 - 0.08 * (1 - t)) * PI;
+      sun.color.set(0xfff1dc);
+      sun.intensity = (0.38 - 0.04 * (1 - t)) * PI;
+      fill.color.set(0xd9e6ee);
+      fill.intensity = (0.34 + 0.1 * (1 - t)) * PI;
+      contactU.value = 0.24 + 0.1 * (1 - t);
+      lawnCur.copy(LAWN_DARK).lerp(new THREE.Color(0xd7e3d8), t);
+      return;
+    }
     hemi.color.set(0xffffff);
     hemi.groundColor.set(0x5e6864);
     // Kept under the old level so a clean wall stays a shaded off-white,
@@ -110,6 +134,17 @@ export function mount(host, opts = {}) {
     lawnCur.copy(LAWN_DARK).lerp(LAWN_LIGHT, t);
   }
   function paintBackdrop(cssColor) {
+    if (premium) {
+      const raw = cssColor || (themeDark() ? '#121614' : '#f3f1ec');
+      bgCur.set(raw);
+      renderer.setClearColor(0x000000, 0);
+      scene.background = null;
+      if (scene.fog) scene.fog.color.copy(bgCur);
+      canvas.style.backgroundColor = 'transparent';
+      applySceneTheme();
+      draw();
+      return;
+    }
     const raw = cssColor || (themeDark() ? '#121618' : '#eceeee');
     bgCur.set(raw);
     renderer.setClearColor(bgCur, 1);
@@ -128,7 +163,7 @@ export function mount(host, opts = {}) {
     themeUntil = performance.now() + 1200;
   }
   let composer = null, fxaaPass = null;
-  if (!msaa) {
+  if (!msaa && !premium) {
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
     fxaaPass = new ShaderPass(FXAAShader);
@@ -150,7 +185,27 @@ export function mount(host, opts = {}) {
   pivot.add(root);
 
   let parts = {}, fxList = [], spec = null, sel = {}, radius = 6, framePts = null;
-  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: col(c), roughness: 0.92, metalness: 0, flatShading: true, ...o });
+  function M(c, o = {}) {
+    const mat = new THREE.MeshStandardMaterial({ color: col(c), roughness: 0.92, metalness: 0, flatShading: true, ...o });
+    if (premium) {
+      if (!o.flatShading) mat.flatShading = false;
+      if (grainTex && mat.roughness >= 0.5) {
+        mat.customProgramCacheKey = () => 'gleam-grain';
+        mat.onBeforeCompile = shader => {
+          shader.uniforms.uGrain = { value: grainTex };
+          shader.vertexShader = shader.vertexShader
+            .replace('#include <common>', '#include <common>\nvarying vec3 vGrainW;')
+            .replace('#include <project_vertex>', '#include <project_vertex>\nvGrainW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+          shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', '#include <common>\nvarying vec3 vGrainW;\nuniform sampler2D uGrain;')
+            .replace('#include <color_fragment>', `#include <color_fragment>
+              float gn = texture2D(uGrain, vGrainW.xz * 1.6).r * 0.62 + texture2D(uGrain, vGrainW.xy * 1.6).r * 0.38;
+              diffuseColor.rgb *= mix(0.94, 1.035, gn);`);
+        };
+      }
+    }
+    return mat;
+  }
   const decalMat = (c, opacity) => new THREE.MeshBasicMaterial({
     color: col(c), transparent: true, opacity, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10,
@@ -201,8 +256,23 @@ export function mount(host, opts = {}) {
   }
   // Darken the foot of a wall and the band under the eaves so a big face is not one flat tone.
   function wallAo(mat) {
-    mat.customProgramCacheKey = () => 'gleam-wall-ao';
+    mat.customProgramCacheKey = () => (premium && grainTex) ? 'gleam-wall-ao-grain' : 'gleam-wall-ao';
     mat.onBeforeCompile = shader => {
+      if (premium && grainTex) {
+        shader.uniforms.uGrain = { value: grainTex };
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying float vWallY;\nvarying vec3 vGrainW;')
+          .replace('#include <project_vertex>', '#include <project_vertex>\nvWallY = (modelMatrix * vec4(transformed, 1.0)).y;\nvGrainW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nvarying float vWallY;\nvarying vec3 vGrainW;\nuniform sampler2D uGrain;')
+          .replace('#include <opaque_fragment>', `#include <opaque_fragment>
+          float baseAo = smoothstep(0.02, 0.7, vWallY);
+          float eave = smoothstep(2.2, 1.25, vWallY);
+          gl_FragColor.rgb *= mix(0.62, 1.0, baseAo) * mix(0.84, 1.0, clamp(eave, 0.0, 1.0));
+          float gn = texture2D(uGrain, vGrainW.xz * 1.6).r * 0.62 + texture2D(uGrain, vGrainW.xy * 1.6).r * 0.38;
+          gl_FragColor.rgb *= mix(0.94, 1.035, gn);`);
+        return;
+      }
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying float vWallY;')
         .replace('#include <project_vertex>', '#include <project_vertex>\nvWallY = (modelMatrix * vec4(transformed, 1.0)).y;');
@@ -216,6 +286,29 @@ export function mount(host, opts = {}) {
     return mat;
   }
   const lawnMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+  if (premium) {
+    // The page canvas is premultiplied. This material writes that itself.
+    lawnMat.premultipliedAlpha = false;
+    lawnMat.customProgramCacheKey = () => 'gleam-lawn-float';
+    lawnMat.onBeforeCompile = shader => {
+      shader.uniforms.uLawn = { value: lawnCur };
+      shader.uniforms.uContact = contactU;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vLawn;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLawn = position.xy;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vLawn;\nuniform vec3 uLawn;\nuniform float uContact;')
+        .replace('#include <fog_fragment>', `#include <fog_fragment>
+        float rad = length(vLawn) * 2.0;
+        float fade = smoothstep(0.16, 0.62, rad);
+        float contact = 1.0 - smoothstep(0.0, 0.36, rad);
+        vec3 lawnLin = max(uLawn, vec3(0.0));
+        vec3 lawnSRGB = mix(lawnLin * 12.92, 1.055 * pow(lawnLin, vec3(0.416666667)) - 0.055, step(vec3(0.0031308), lawnLin));
+        lawnSRGB *= 1.0 - uContact * contact;
+        float alpha = 1.0 - fade;
+        gl_FragColor = vec4(lawnSRGB * alpha, alpha);`);
+    };
+  } else {
   lawnMat.customProgramCacheKey = () => 'gleam-lawn';
   lawnMat.onBeforeCompile = shader => {
     shader.uniforms.uBg = { value: bgCur };
@@ -237,6 +330,7 @@ export function mount(host, opts = {}) {
         lawnSRGB *= 1.0 - uContact * contact;
         gl_FragColor.rgb = mix(lawnSRGB, bgSRGB, fade);`);
   };
+  }
   function grime(p, mesh, mode) {
     mesh.renderOrder = 4;
     mesh.userData.mode = mode;
@@ -270,6 +364,21 @@ export function mount(host, opts = {}) {
       panel: '#3e5568', panelDirty: '#b3a68a', tree: '#d3dbdd', nb: '#e4e9ea',
       frame: '#d3dce0', garage: '#c5ced3'
     };
+    if (premium) {
+      C.wall = '#f4f1eb';
+      C.wallDirty = '#c9b89a';
+      C.roof = '#6a635b';
+      C.roofDirty = '#514c44';
+      C.pave = '#d5cfc5';
+      C.paveDirty = '#b3a690';
+      C.gut = '#e4ded4';
+      C.gutDirty = '#b09f86';
+      C.frame = '#e3dcd2';
+      C.glass = '#d4e3ec';
+      C.glassDirty = '#c2b296';
+      C.panel = '#355066';
+      C.panelDirty = '#a89878';
+    }
     const flat = s.roof === 'flat';
     const FH = 1.0, H = s.floors * FH, bay = 1.0;
     const W = s.bays * bay + 0.4, Dp = flat ? 3.0 : 2.4;
@@ -431,7 +540,7 @@ export function mount(host, opts = {}) {
 
     // windows
     const pwin = part('windows');
-    const glassMat = dirtyMat(pwin, C.glassDirty, C.glass, { roughness: 0.16, metalness: 0.04, emissive: col('#000000') });
+    const glassMat = dirtyMat(pwin, C.glassDirty, C.glass, { roughness: premium ? 0.1 : 0.16, metalness: premium ? 0.06 : 0.04, emissive: col('#000000') });
     const frameMat = M(C.frame, { roughness: 0.92 });
     const pane = (w, h, d, x, y, z) => {
       const m = box(w, h, d, glassMat, x, y, z);
@@ -672,7 +781,7 @@ export function mount(host, opts = {}) {
     paveMat.polygonOffset = true;
     paveMat.polygonOffsetFactor = -2;
     paveMat.polygonOffsetUnits = -2;
-    paveMat.customProgramCacheKey = () => 'gleam-pave-plate';
+    paveMat.customProgramCacheKey = () => (premium && grainTex) ? 'gleam-pave-plate-grain' : 'gleam-pave-plate';
     paveMat.userData.driveK = paveU.driveK;
     paveMat.userData.patioK = paveU.patioK;
     paveMat.onBeforeCompile = shader => {
@@ -683,17 +792,21 @@ export function mount(host, opts = {}) {
       shader.uniforms.uDriveK = paveU.driveK;
       shader.uniforms.uPatioK = paveU.patioK;
       shader.uniforms.uSeam = paveU.seam;
-      shader.vertexShader = 'varying float vPaveX;\n' + shader.vertexShader.replace(
+      const g = premium && grainTex;
+      if (g) shader.uniforms.uGrain = { value: grainTex };
+      shader.vertexShader = 'varying float vPaveX;\n' + (g ? 'varying vec3 vGrainW;\n' : '') + shader.vertexShader.replace(
         '#include <project_vertex>',
-        '#include <project_vertex>\nvPaveX = (modelMatrix * vec4(transformed, 1.0)).x;'
+        '#include <project_vertex>\nvPaveX = (modelMatrix * vec4(transformed, 1.0)).x;' + (g ? '\nvGrainW = (modelMatrix * vec4(transformed, 1.0)).xyz;' : '')
       );
-      shader.fragmentShader = 'varying float vPaveX;\nuniform vec3 uDriveA;\nuniform vec3 uDriveB;\nuniform vec3 uPatioA;\nuniform vec3 uPatioB;\nuniform float uDriveK;\nuniform float uPatioK;\nuniform float uSeam;\n' + shader.fragmentShader.replace(
+      shader.fragmentShader = 'varying float vPaveX;\n' + (g ? 'varying vec3 vGrainW;\nuniform sampler2D uGrain;\n' : '') + 'uniform vec3 uDriveA;\nuniform vec3 uDriveB;\nuniform vec3 uPatioA;\nuniform vec3 uPatioB;\nuniform float uDriveK;\nuniform float uPatioK;\nuniform float uSeam;\n' + shader.fragmentShader.replace(
         '#include <color_fragment>',
         `#include <color_fragment>
         float side = smoothstep(uSeam - 0.05, uSeam + 0.05, vPaveX);
         vec3 driveCol = mix(uDriveA, uDriveB, uDriveK);
         vec3 patioCol = mix(uPatioA, uPatioB, uPatioK);
-        diffuseColor.rgb = mix(patioCol, driveCol, side);`
+        diffuseColor.rgb = mix(patioCol, driveCol, side);` + (g ? `
+        float gn = texture2D(uGrain, vGrainW.xz * 2.2).r;
+        diffuseColor.rgb *= mix(0.93, 1.045, gn);` : '')
       );
     };
     pd.mats.push(paveMat);
@@ -842,6 +955,7 @@ export function mount(host, opts = {}) {
     sun.position.set(span * 0.9 + 4, H + 7.5, span * 0.35 + 5);
     // Behind and to the left, so the faces the sun misses still have shade.
     fill.position.set(-span * 0.55 - 3, H + 6, -span - 6);
+    if (premium) sun.position.y += 1.6;
     sun.target.position.set(0, H * 0.35, 0);
     sun.target.updateMatrixWorld();
     Object.values(parts).forEach(applyClean);
@@ -1354,7 +1468,9 @@ export function mount(host, opts = {}) {
     const vh = window.innerHeight || 700;
     // Phone: a taller stage narrows the horizontal view so the front of the
     // house can fill the width without the top-down orbit leaving the frame.
-    const h = Math.round(wide ? Math.min(w / 1.12, vh * 0.74) : Math.min(w / 1.18, vh * 0.48));
+    const h = Math.round(premium
+      ? (wide ? Math.min(w / 1.35, vh * 0.5) : Math.min(w / 1.18, vh * 0.42))
+      : (wide ? Math.min(w / 1.12, vh * 0.74) : Math.min(w / 1.18, vh * 0.48)));
     // A language switch can notify the observer without changing the drawing size.
     // Skip that so the camera is not framed again. A real rebuild still reframes.
     if (fromObserver && (!host.clientWidth || (w === viewW && h === viewH))) return;
@@ -1513,7 +1629,7 @@ export function mount(host, opts = {}) {
     contextAttributes() {
       const a = gl.getContextAttributes() || {};
       return {
-        requested: { alpha: false, antialias: true, powerPreference: 'high-performance', stencil: false },
+        requested: { alpha: requestedGL.alpha, antialias: true, powerPreference: 'high-performance', stencil: false },
         alpha: !!a.alpha,
         antialias: !!a.antialias,
         powerPreference: a.powerPreference || '',
