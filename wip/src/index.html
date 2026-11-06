@@ -486,6 +486,13 @@ html.gl-wait .house{visibility:hidden;height:min(calc(100cqi / 1.12),74svh);max-
 .stage.gl-on .gl3{position:relative;pointer-events:auto}
 .stage.gl-show .gl3{opacity:1}
 </style>
+<script>
+(function(){
+  try { document.documentElement.dataset.mode = sessionStorage.getItem("gleam.mode") === "quote" ? "quote" : "instant"; } catch (_) {}
+  var base = location.pathname.replace(/(?:premium\/)?(?:us|uk|ie|ca|au|sa|nz)\/?(?:index\.html)?$/i, '').replace(/index\.html$/i, '');
+  document.write('<link rel="stylesheet" href="' + base + 'quote-mode.css"><script src="' + base + 'quote-mode.js"><\/script>');
+})();
+</script>
 </head>
 <body>
 <div class="page">
@@ -1528,6 +1535,12 @@ function update() {
   sumBtn.disabled = !ok;
   statusEl.classList.remove('ok');
   statusEl.textContent = tr(!t.n ? 'Pick at least one service to book.' : !ok ? 'Add your name and mobile number to book.' : 'Sends your request from this page.');
+  if (!modes || !modes.isQuote()) {
+    if ($('#heroRisk')) $('#heroRisk').textContent = tr('The final price is confirmed with you.');
+    $('#hSum').textContent = tr('Your estimate');
+    const footer = $('#footNote') || $('.foot'); footer.textContent = tr('Demo page with sample prices.');
+  }
+  if (modes) modes.paint(t.items, t.n, ok);
 }
 
 /* ---------- actions ---------- */
@@ -1590,12 +1603,20 @@ function deliver(payload) {
   (CHANNELS[R().booking] || CHANNELS.page)(payload);
 }
 function showBooking(payload) {
+  const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const original = payload;
+  payload = { ...payload, name: escape(payload.name), phone: escape(payload.phone) };
   bookDlg.classList.remove('is-sent');
   bookTitle.textContent = tr('Your request');
-  const rows = payload.items.map(it => `<div class="line"><span class="l">${it.label}</span><span class="r">${money(it.price)}</span></div>`).join('')
-    + (payload.disc ? `<div class="line soft"><span class="l">${isAr() ? `خصم الباقة ${payload.disc}` : `Bundle saving ${payload.disc}`}</span></div>` : '')
-    + (payload.minimum ? `<div class="line"><span class="l">${tr('Minimum visit')}</span><span class="r">${payload.minimum}</span></div>` : '');
-  bookBody.innerHTML = `<p class="book-person">${payload.name}</p><p class="book-person">${payload.phone}</p><p class="book-person">${payload.home}</p><div class="lines">${rows}</div><p class="book-total"><span>${tr('Estimate')}</span><strong>${payload.total}</strong></p><p class="book-when">${tr('Preferred day')} ${payload.when}</p>${payload.location ? `<p class="book-loc">${payload.location}</p>` : ''}`;
+  if (payload.mode === 'quote') {
+    bookTitle.textContent = isAr() ? 'طلب عرض سعر' : 'Your quote request';
+    modes.review(original, bookBody);
+  } else {
+    const rows = payload.items.map(it => `<div class="line"><span class="l">${it.label}</span><span class="r">${money(it.price)}</span></div>`).join('')
+      + (payload.disc ? `<div class="line soft"><span class="l">${isAr() ? `خصم الباقة ${payload.disc}` : `Bundle saving ${payload.disc}`}</span></div>` : '')
+      + (payload.minimum ? `<div class="line"><span class="l">${tr('Minimum visit')}</span><span class="r">${payload.minimum}</span></div>` : '');
+    bookBody.innerHTML = `<p class="book-person">${payload.name}</p><p class="book-person">${payload.phone}</p><p class="book-person">${payload.home}</p><div class="lines">${rows}</div><p class="book-total"><span>${tr('Estimate')}</span><strong>${payload.total}</strong></p><p class="book-when">${tr('Preferred day')} ${payload.when}</p>${payload.location ? `<p class="book-loc">${payload.location}</p>` : ''}`;
+  }
   bookSend.hidden = false;
   bookSend.textContent = tr('Send request');
   bookClose.textContent = tr('Close');
@@ -1604,17 +1625,21 @@ function showBooking(payload) {
 }
 function showSent() {
   bookDlg.classList.add('is-sent');
-  bookTitle.textContent = tr('Request sent');
-  bookBody.innerHTML = `<p class="book-sent">${tr('We have your name, your number and the services you picked.')}</p>`;
+  bookTitle.textContent = isAr() ? 'تم تسجيل الطلب التجريبي' : 'Demo request recorded';
+  bookBody.textContent = modes.demo();
   bookSend.hidden = true;
   bookClose.textContent = tr('Close');
   bookClose.focus();
 }
 function book() {
-  deliver(bookingPayload());
+  deliver(modes.payload(bookingPayload()));
 }
 
 function goDetails() {
+  if (modes.isQuote()) {
+    $('#quoteFields').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    return;
+  }
   detailsEl.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
   const target = state.name.trim().length < 2 ? nameIn : phoneIn;
   setTimeout(() => { try { target.focus({ preventScroll: true }); } catch (_) { target.focus(); } }, reduced ? 0 : 520);
@@ -1853,7 +1878,12 @@ regionSel.addEventListener('change', () => {
 });
 
 barBtn.addEventListener('click', () => { if (ready(totals())) book(); else goDetails(); });
-sumBtn.addEventListener('click', () => { if (ready(totals())) book(); });
+sumBtn.addEventListener('click', () => {
+  const t = totals();
+  if (ready(t)) book();
+  else if (!t.n) stageWrap.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+  else goDetails();
+});
 bookSend.addEventListener('click', () => showSent());
 
 let ticking = false;
@@ -1861,7 +1891,8 @@ function chrome() {
   ticking = false;
   if (desktop.matches) { stageWrap.classList.remove('away'); bar.classList.remove('tuck'); return; }
   const vh = window.innerHeight;
-  stageWrap.classList.toggle('away', detailsEl.getBoundingClientRect().top < vh * 0.6);
+  const formStart = modes.isQuote() ? $('#quoteFields') : detailsEl;
+  stageWrap.classList.toggle('away', formStart.getBoundingClientRect().top < vh * 0.6);
   const b = sumBtn.getBoundingClientRect();
   bar.classList.toggle('tuck', b.top < vh - 8 && b.bottom > 0);
 }
@@ -2186,6 +2217,8 @@ langSw.addEventListener('click', e => {
   }
   ready.then(() => { if (token === langGen) crossfadeLang(token); });
 });
+
+const modes = window.GleamModes.mount({ refresh: update, arabic: isAr, translate: tr });
 
 /* ---------- start ---------- */
 state.region = detectRegion();

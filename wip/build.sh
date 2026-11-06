@@ -3,7 +3,7 @@
 set -e
 rm -rf dist && mkdir -p dist
 for d in "" us uk ie ca au nz sa; do mkdir -p "dist/$d"; cp src/index.html "dist/$d/index.html"; done
-cp src/house3d.js dist/
+cp src/house3d.js src/quote-mode.js src/quote-mode.css dist/
 mkdir -p dist/fonts
 cp src/fonts/*.woff2 dist/fonts/
 cp src/_headers dist/ 2>/dev/null || true

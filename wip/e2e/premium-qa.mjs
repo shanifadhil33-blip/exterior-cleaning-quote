@@ -1,4 +1,4 @@
-// Checks for the premium quote page, plus a pixel diff of the live pages.
+// Premium regressions. Classic pixel comparison is opt in after an intentional shared UI change.
 // PREM=http://127.0.0.1:8787 LIVE=http://127.0.0.1:8788 node premium-qa.mjs
 import { createRequire } from 'module';
 import fs from 'fs';
@@ -6,7 +6,7 @@ import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
 const { chromium } = createRequire(import.meta.url)('playwright');
 const PREM = process.env.PREM || 'http://127.0.0.1:8787';
-const LIVE = process.env.LIVE || 'http://127.0.0.1:8788';
+const LIVE = process.env.LIVE || PREM;
 const OUT = process.env.OUT || '/tmp/prem-qa';
 fs.mkdirSync(OUT, { recursive: true });
 const DASH = /[\-\u2010-\u2015\u2212]/;
@@ -260,7 +260,7 @@ console.log('dark desktop');
   await ctx.close();
 }
 
-console.log('live page pixel diff');
+console.log('live page pixel diff (requires COMPARE_CLASSIC=1; classic now intentionally includes modes)');
 async function shotLive(base, path, width, theme) {
   const phone = width < 960;
   const ctx = await browser.newContext({
@@ -278,7 +278,7 @@ async function shotLive(base, path, width, theme) {
   await ctx.close();
   return buf;
 }
-for (const path of ['/uk/', '/sa/']) {
+if (process.env.COMPARE_CLASSIC === '1') for (const path of ['/uk/', '/sa/']) {
   for (const width of [390, 1440]) {
     for (const theme of ['light', 'dark']) {
       const a = PNG.sync.read(await shotLive(LIVE, path, width, theme));
